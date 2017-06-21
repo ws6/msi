@@ -3,109 +3,61 @@ package msi
 import (
 	"fmt"
 	"strings"
+
+	"github.com/mijia/modelq/drivers" //thank you mijia
 )
 
-type Field struct {
-	Name     string
-	Type     string
-	IsNumber bool
-	Length   int
+type Msi struct {
+	Tables       []*Table
+	DsnString    string //mysql or postgre
+	DatabaseName string //database name or schema in postgres
 }
 
-type Table struct {
-	TableName string
-	Fields    []*Field
-}
+func (self *Msi) GetTable(tableName string) *Table {
 
-var (
-	TABLES = make(map[string]*Table)
-)
-
-func IsNumber(t string) bool {
-
-	if strings.Contains(t, `int`) {
-		return true
-	}
-	if strings.Contains(t, `float`) {
-		return true
-	}
-	return false
-
-}
-
-func Register(t *Table) {
-
-	for _, f := range t.Fields {
-		if IsNumber(f.Type) {
-			f.IsNumber = true
+	for _, table := range self.Tables {
+		if table.TableName == tableName {
+			return table
 		}
-	}
-
-	TABLES[t.TableName] = t
-}
-
-func GetTable(tableName string) *Table {
-	if t, ok := TABLES[tableName]; ok {
-		return t
 	}
 
 	return nil
 }
 
-func (t *Table) GetFieldNames() []string {
-	ret := []string{}
-	for _, f := range t.Fields {
-		ret = append(ret, f.Name)
-	}
-	return ret
-}
+//NewMsi loading all tables field definitions from database
+//NewMsi(`mysql`, `rw_sage:Exxxc0ndid0@(ussd-prd-mysq01:3306)/sage`, `sage`,``)
 
-func (t *Table) GetField(f string) *Field {
-	for _, field := range t.Fields {
-		if field.Name == f {
-			return field
-		}
-	}
-	return nil
-}
-
-type NameVal struct {
-	Name  string
-	Value string
-}
-
-func (t *Table) MakeInsertFields(updates []*NameVal) []string {
-	ret := []string{}
-
-	for _, item := range updates {
-		k := item.Name
-		if _f := t.GetField(k); _f == nil {
-			continue
-		}
-
-		ret = append(ret, k)
+func NewMsi(driver, dsnString, schema, tableNames string) (*Msi, error) {
+	ret := new(Msi)
+	ret.DatabaseName = schema
+	dbSchema, err := drivers.LoadDatabaseSchema(driver, dsnString, schema, tableNames)
+	if err != nil {
+		return nil, err
 	}
 
-	return ret
-}
+	for tbl, cols := range dbSchema {
 
-func (t *Table) MakeInsertValues(updates []*NameVal) []string {
-	ret := []string{}
-
-	for _, item := range updates {
-		k, v := item.Name, item.Value
-		_f := t.GetField(k)
-		if _f == nil {
-			continue
+		table := new(Table)
+		table.TableName = tbl
+		for _, col := range cols {
+			field := &Field{
+				Name:     col.ColumnName,
+				Type:     col.DataType,
+				IsNumber: IsNumber(col.DataType),
+				//TODO ParseLength
+				IsNullable:      strings.ToUpper(col.IsNullable) == "YES",
+				JsonMeta:        fmt.Sprintf("`json:\"%s\"`", col.ColumnName),
+				IsPrimaryKey:    strings.ToUpper(col.ColumnKey) == "PRI",
+				IsUniqueKey:     strings.ToUpper(col.ColumnKey) == "UNI",
+				IsIndexed:       strings.ToUpper(col.ColumnKey) == "MUL",
+				IsAutoIncrement: strings.ToUpper(col.Extra) == "AUTO_INCREMENT",
+				DefaultValue:    col.DefaultValue,
+				Extra:           col.Extra,
+				Comment:         col.Comment,
+			}
+			table.Fields = append(table.Fields, field)
 		}
-		_v := Escape(v)
-
-		if !_f.IsNumber {
-			_v = fmt.Sprintf("'%s'", _v)
-		}
-
-		ret = append(ret, _v)
+		ret.Tables = append(ret.Tables, table)
 	}
-
-	return ret
+	return ret, nil
 }

@@ -60,7 +60,7 @@ func ToSQLOperator(op string) string {
 	case EXISTS:
 		return `IS NOT NULL`
 	case LIKE:
-		return `like`
+		return `LIKE`
 	}
 	return ""
 }
@@ -143,6 +143,13 @@ func NewWhere(logicOp, compOp string) *Where {
 
 type WhereErr struct {
 	Message string
+}
+
+func ParseCritErr(err interface{}) bool {
+	if _, ok := err.(WhereErr); ok {
+		return true
+	}
+	return false
 }
 
 func (self *WhereErr) Error() string {
@@ -320,7 +327,55 @@ func ParseWhere(crit map[string]interface{}, ret *[]*Where, logicOp, compOp, fie
 
 }
 
+func (t *Table) SafeWhere(crit map[string]interface{}) (string, error) {
+
+	//build select query
+
+	_wheres, err := ParseCrit(crit)
+	if err != nil {
+		return "", err
+	}
+
+	wheres := []*Where{}
+
+	for _, where := range _wheres {
+		//Align fieldname
+		for _, field := range t.Fields {
+			if field.Name == where.FieldName {
+				wheres = append(wheres, where)
+			}
+		}
+	}
+	whereClause := fmt.Sprintf(`WHERE TRUE  %s`, ToWhereString(wheres))
+
+	return whereClause, nil
+
+}
+
 //Find filter out bad fields and correct types to make query
-func (t *Table) Find(crit map[string]interface{}) string {
-	return ""
+func (t *Table) Find(crit map[string]interface{}) (string, error) {
+	selectedFields := []string{}
+	for _, field := range t.Fields {
+		if field.Selected {
+			selectedFields = append(selectedFields, field.Name)
+		}
+	}
+
+	if len(selectedFields) == 0 {
+		selectedFields = []string{`*`} //not sufficient
+	}
+	ret := fmt.Sprintf("SELECT %s FROM %s", strings.Join(selectedFields, ", "), t.TableName)
+	if crit == nil {
+		return fmt.Sprintf("%s  ", ret), nil
+	}
+
+	whereClause, err := t.SafeWhere(crit)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf(`%s %s `, ret, whereClause), nil
+}
+
+func (t *Table) FindId(id int) (string, error) {
+	return t.Find(map[string]interface{}{`id`: id})
 }
