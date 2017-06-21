@@ -12,7 +12,7 @@ func InterfaceToString(i interface{}) string {
 		return `null` //!!! mysql dialect
 	}
 	if s, ok := i.(string); ok {
-		return s
+		return fmt.Sprintf("'%s'", Escape(s))
 	}
 	if s, ok := i.(bool); ok {
 		if s {
@@ -36,7 +36,7 @@ func InterfaceToString(i interface{}) string {
 	}
 
 	if s, ok := i.(time.Time); ok {
-		return s.String() //TODO to be better formatted
+		return fmt.Sprintf("'%s'", Escape(s.String())) //TODO to be better formatted
 	}
 	return ""
 }
