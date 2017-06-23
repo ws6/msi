@@ -50,6 +50,11 @@ Load Table definitions and CRUD functions
 			t.Fatal(err.Error())
 		}
 		t.Log(query)
+		query, err = table.Count()
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+		t.Log(query)
 
 	}
 ```
@@ -68,6 +73,12 @@ func TestParseGroupBY(t *testing.T) {
 	}
 
 	query, err := flowcell.Find(where, meta)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+
+	t.Log(query)
+	query, err = flowcell.Count(where, meta)
 	if err != nil {
 		t.Fatal(err.Error())
 	}

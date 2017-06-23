@@ -428,11 +428,9 @@ func ParseMetaQuery(crit map[string]interface{}) (*MetaQuery, error) {
 	return ret, nil
 }
 
-//Find filter out bad fields and correct types to make query
-//TODO parse secondary map for Groupby and offset limit statemetns
-func (t *Table) Find(others ...map[string]interface{}) (string, error) {
+//TODO refactor Count
 
-	selectedFields := []string{}
+func (t *Table) find(others ...map[string]interface{}) (selectedFields []string, nonSelectClause string, orderby []string, limit int, offset int, err error) {
 	for _, field := range t.Fields {
 		if field.Selected {
 			selectedFields = append(selectedFields, field.Name)
@@ -442,10 +440,10 @@ func (t *Table) Find(others ...map[string]interface{}) (string, error) {
 	if len(selectedFields) == 0 {
 		selectedFields = []string{`*`} //not sufficient
 	}
-	ret := fmt.Sprintf("SELECT %s FROM %s", strings.Join(selectedFields, ", "), t.TableName)
+	nonSelectClause = fmt.Sprintf("FROM %s", t.TableName)
 
 	if len(others) == 0 {
-		return fmt.Sprintf("%s  ", ret), nil
+		return
 	}
 
 	var crit map[string]interface{}
@@ -455,44 +453,74 @@ func (t *Table) Find(others ...map[string]interface{}) (string, error) {
 	}
 
 	if crit == nil {
-		return fmt.Sprintf("%s  ", ret), nil
+		return
 	}
 
-	whereClause, err := t.SafeWhere(crit)
-	if err != nil {
-		return "", err
+	whereClause, _err := t.SafeWhere(crit)
+	if _err != nil {
+		err = _err
+		return
 	}
 	if len(others) == 1 {
-		return fmt.Sprintf(`%s %s `, ret, whereClause), nil
+		nonSelectClause = fmt.Sprintf(`%s %s `, nonSelectClause, whereClause)
+		return
 	}
 
 	//if len(others) > 1 {
-	mq, err := ParseMetaQuery(others[1])
+	mq, _err := ParseMetaQuery(others[1])
 	if err != nil {
-		return "", err
+		err = _err
+		return
 	}
 	if len(mq.Fields) > 0 {
 		selectedFields = mq.Fields //!!!overwrite
 	}
 	// like statement will get replaced
-	ret = fmt.Sprintf("SELECT %s FROM %s %s", strings.Join(selectedFields, ", "), t.TableName, whereClause)
+	nonSelectClause = fmt.Sprintf("FROM %s %s", t.TableName, whereClause)
 
 	if len(mq.GroupBy) > 0 {
 		//TODO to add field checker?
-		ret = fmt.Sprintf(`%s GROUP BY %s`, ret, strings.Join(mq.GroupBy, " ,"))
+		nonSelectClause = fmt.Sprintf(`%s GROUP BY %s`, nonSelectClause, strings.Join(mq.GroupBy, " ,"))
 	}
 
 	if len(mq.Orderby) > 0 {
-		ret = fmt.Sprintf(`%s ORDER BY %s`, ret, strings.Join(mq.Orderby, " ,"))
+		orderby = mq.Orderby
+		//		nonSelectClause = fmt.Sprintf(`%s ORDER BY %s`, nonSelectClause, strings.Join(mq.Orderby, " ,"))
 	}
 
-	if mq.Limit > 0 {
-		ret = fmt.Sprintf(`%s LIMIT %d`, ret, mq.Limit)
-	}
+	limit = mq.Limit
+	offset = mq.Offset
+	return
+}
 
-	if mq.Offset > 0 {
-		ret = fmt.Sprintf(`%s OFFSET %d`, ret, mq.Offset)
+//Find filter out bad fields and correct types to make query
+func (t *Table) Find(others ...map[string]interface{}) (string, error) {
+
+	selectedFields, nonSelectClause, orderby, limit, offset, err := t.find(others...)
+	if err != nil {
+		return "", err
 	}
+	ret := fmt.Sprintf(`SELECT %s %s`, strings.Join(selectedFields, ", "), nonSelectClause)
+	if len(orderby) > 0 {
+		ret = fmt.Sprintf(`%s ORDER BY %s`, ret, strings.Join(orderby, " ,"))
+	}
+	if limit > 0 {
+		ret = fmt.Sprintf(`%s LIMIT %d`, ret, limit)
+	}
+	if offset > 0 {
+		ret = fmt.Sprintf(`%s LIMIT %d`, ret, offset)
+	}
+	return ret, nil
+}
+
+//Count the field name out of this query is "count" in lowercase
+func (t *Table) Count(others ...map[string]interface{}) (string, error) {
+
+	_, nonSelectClause, _, _, _, err := t.find(others...)
+	if err != nil {
+		return "", err
+	}
+	ret := fmt.Sprintf(`SELECT count(*) as count %s`, nonSelectClause)
 
 	return ret, nil
 
