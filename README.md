@@ -77,10 +77,10 @@ func TestParseGroupBY(t *testing.T) {
 }
 ```
 
-Shorten the writtings with redefined msi
+Shorten the writtings  - https://github.com/go-mgo/mgo/blob/v2-unstable/bson/bson.go#L111
 ```
 func TestNameAlias(t *testing.T) {
-	query, err := flowcell.Find(M{`id`: 123})
+	query, err := flowcell.Find(msi.M{`id`: 123})
 	if err != nil {
 		t.Fatal(err.Error())
 	}
