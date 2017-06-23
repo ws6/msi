@@ -76,3 +76,14 @@ func TestParseGroupBY(t *testing.T) {
 
 }
 ```
+
+Shorten the writtings with redefined msi
+```
+func TestNameAlias(t *testing.T) {
+	query, err := flowcell.Find(M{`id`: 123})
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	t.Log(query)
+}
+```

@@ -7,6 +7,8 @@ import (
 	"github.com/mijia/modelq/drivers" //thank you mijia
 )
 
+type M map[string]interface{}
+
 type Msi struct {
 	Tables       []*Table
 	DsnString    string //mysql or postgre
