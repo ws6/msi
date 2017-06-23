@@ -31,6 +31,7 @@ const (
 	LIKE   = `$like`
 	//meta query constants
 	FIELDS  = `$fields` // not part of SQL syntax; for overwritting the default field selection
+	JOINS   = `$joins`  // not part of SQL syntax
 	OFFSET  = `$offset`
 	LIMIT   = `$limit`
 	GROUPBY = `$groupby`
@@ -50,6 +51,8 @@ func IsMetaQuery(op string) bool {
 	case GROUPBY:
 		return true
 	case ORDERBY:
+		return true
+	case JOINS:
 		return true
 
 	}
@@ -366,7 +369,8 @@ func (t *Table) SafeWhere(crit map[string]interface{}) (string, error) {
 	for _, where := range _wheres {
 		//Align fieldname
 		for _, field := range t.Fields {
-			if field.Name == where.FieldName {
+			//loosing the checker by allow tablename.fieldname format
+			if field.Name == where.FieldName || fmt.Sprintf(`%s.%s`, t.TableName, field.Name) == where.FieldName {
 				wheres = append(wheres, where)
 			}
 		}
@@ -383,6 +387,7 @@ type MetaQuery struct {
 	Limit   int
 	GroupBy []string
 	Fields  []string
+	Joins   []string
 }
 
 func InterfaceToStringArray(v interface{}) []string {
@@ -421,14 +426,14 @@ func ParseMetaQuery(crit map[string]interface{}) (*MetaQuery, error) {
 			ret.Fields = InterfaceToStringArray(v)
 		case ORDERBY:
 			ret.Orderby = InterfaceToStringArray(v)
+		case JOINS:
+			ret.Joins = InterfaceToStringArray(v)
 		default:
 			continue
 		}
 	}
 	return ret, nil
 }
-
-//TODO refactor Count
 
 func (t *Table) find(others ...map[string]interface{}) (selectedFields []string, nonSelectClause string, orderby []string, limit int, offset int, err error) {
 	for _, field := range t.Fields {
@@ -475,9 +480,18 @@ func (t *Table) find(others ...map[string]interface{}) (selectedFields []string,
 	if len(mq.Fields) > 0 {
 		selectedFields = mq.Fields //!!!overwrite
 	}
-	// like statement will get replaced
-	nonSelectClause = fmt.Sprintf("FROM %s %s", t.TableName, whereClause)
 
+	nonSelectClause = fmt.Sprintf("FROM %s  ", t.TableName)
+
+	//install joins; Please note joins are free form.
+	if len(mq.Joins) > 0 {
+		//TODO adding joins
+		nonSelectClause = fmt.Sprintf("%s  %s", nonSelectClause, strings.Join(mq.Joins, " "))
+	}
+	//install nonSelectClause
+	nonSelectClause = fmt.Sprintf("%s %s", nonSelectClause, whereClause)
+
+	//intall groupby
 	if len(mq.GroupBy) > 0 {
 		//TODO to add field checker?
 		nonSelectClause = fmt.Sprintf(`%s GROUP BY %s`, nonSelectClause, strings.Join(mq.GroupBy, " ,"))
@@ -485,11 +499,20 @@ func (t *Table) find(others ...map[string]interface{}) (selectedFields []string,
 
 	if len(mq.Orderby) > 0 {
 		orderby = mq.Orderby
-		//		nonSelectClause = fmt.Sprintf(`%s ORDER BY %s`, nonSelectClause, strings.Join(mq.Orderby, " ,"))
 	}
 
 	limit = mq.Limit
 	offset = mq.Offset
+
+	if len(others) == 2 {
+		return
+	}
+	//TODO adding joins, in a simple syntax
+
+	joins := others[2]
+	//TODO parse joins
+
+	_ = joins
 	return
 }
 
@@ -501,6 +524,8 @@ func (t *Table) Find(others ...map[string]interface{}) (string, error) {
 		return "", err
 	}
 	ret := fmt.Sprintf(`SELECT %s %s`, strings.Join(selectedFields, ", "), nonSelectClause)
+
+	//install orderby
 	if len(orderby) > 0 {
 		ret = fmt.Sprintf(`%s ORDER BY %s`, ret, strings.Join(orderby, " ,"))
 	}
@@ -508,7 +533,7 @@ func (t *Table) Find(others ...map[string]interface{}) (string, error) {
 		ret = fmt.Sprintf(`%s LIMIT %d`, ret, limit)
 	}
 	if offset > 0 {
-		ret = fmt.Sprintf(`%s LIMIT %d`, ret, offset)
+		ret = fmt.Sprintf(`%s OFFSET %d`, ret, offset)
 	}
 	return ret, nil
 }
@@ -520,10 +545,7 @@ func (t *Table) Count(others ...map[string]interface{}) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	ret := fmt.Sprintf(`SELECT count(*) as count %s`, nonSelectClause)
-
-	return ret, nil
-
+	return fmt.Sprintf(`SELECT count(*) as count %s`, nonSelectClause), nil
 }
 
 func (t *Table) FindId(id int) (string, error) {

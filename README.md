@@ -63,27 +63,30 @@ Build a query from Mongodb flavor
 ```
 func TestParseGroupBY(t *testing.T) {
 	where := map[string]interface{}{
-		`id`: map[string]interface{}{`$in`: []int{123, 456, 789}},
-	}
-	meta := map[string]interface{}{
-		msi.LIMIT: 5, msi.OFFSET: 101,
-		msi.GROUPBY: []string{`flowcell_barcode`, `RecipePath`},
-		msi.ORDERBY: []string{`flowcell_barcode desc`},
-		msi.FIELDS:  []string{`flowcell_barcode`},
-	}
-
-	query, err := flowcell.Find(where, meta)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-
-	t.Log(query)
-	query, err = flowcell.Count(where, meta)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-
-	t.Log(query)
+			`flowcell.id`: map[string]interface{}{`$in`: []int{123, 456, 789}},
+		}
+		meta := map[string]interface{}{
+			LIMIT: 5, OFFSET: 101,
+			GROUPBY: []string{`flowcell_barcode`, `RecipePath`},
+			ORDERBY: []string{`flowcell_barcode desc`},
+			FIELDS:  []string{`flowcell_barcode`},
+			JOINS:   []string{`join flowcell_resource fr on fr.id = flowcell.flowcell_resource_id`}, //create joins  yourself
+		}
+	
+		query, err := flowcell.Find(where, meta)
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+	
+		t.Log(query)
+	
+		query, err = flowcell.Count(where, meta)
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+	
+		t.Log(query)
+	
 
 }
 ```

@@ -25,6 +25,7 @@ type Field struct {
 
 type Table struct {
 	TableName string
+	JoinAlias string //used when join queries envoled; for use space
 	Fields    []*Field
 }
 
