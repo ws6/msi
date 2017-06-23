@@ -80,50 +80,44 @@ func TestLoadTables(t *testing.T) {
 	if err != nil {
 		t.Fatal()
 	}
+	t.Log(`Total Number of Tables: `, len(schema.Tables))
+	t.Log(`##############`)
+	crit := map[string]interface{}{`id`: 123}
+	updates := map[string]interface{}{`id`: `updated values`}
+	for _, table := range schema.Tables {
+		t.Log(`###`)
+		t.Log(` Table:`, table.TableName, `,`, `number of fields:`, len(table.Fields))
+		table.SelectAll()
+		query, err := table.FindId(123)
+		if err != nil {
+			t.Fatal(err.Error())
+		}
 
-	flowcell := schema.GetTable(`flowcell`)
-	if flowcell == nil {
-		t.Fatal(`no flowcell table found`)
-	}
-	query, err := flowcell.Find(nil)
+		table.UnSelectAllFields()
+		t.Log(query)
+		query, err = table.Find(crit)
+		if err != nil {
+			t.Fatal(err.Error())
+		}
 
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	t.Log(query)
+		t.Log(query)
+		query, err = table.UpdateId(1, updates)
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+		t.Log(query)
+		query, err = table.RemoveId(123)
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+		t.Log(query)
+		query, err = table.Insert(updates)
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+		t.Log(query)
 
-	crit := map[string]interface{}{
-		`not_exist_field`:  `should get filtered`,
-		`id`:               1234,
-		`flowcell_barcode`: map[string]interface{}{`$like`: `%ABBA%`},
-		`RecipePath`:       map[string]interface{}{`$in`: []string{`/illumina`, `/scratch`, `\\ussd-prd-isi04\Voyager`}},
 	}
-	query2, err := flowcell.Find(crit)
-
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	t.Log(query2)
-	if barcodeField := flowcell.GetField(`flowcell_barcode`); barcodeField != nil {
-		barcodeField.Selected = true
-	}
-	if barcodeField := flowcell.GetField(`RecipePath`); barcodeField != nil {
-		barcodeField.Selected = true
-	}
-	query3, err := flowcell.Find(crit)
-
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	t.Log(query3)
-
-	query4, err := flowcell.FindId(19810505)
-
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	t.Log(query4)
-
 }
 
 func TestParseGroupBY(t *testing.T) {
