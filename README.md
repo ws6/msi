@@ -10,6 +10,15 @@ Attempt to achieve the similar interface as mongodb does.
 ## Usage
 Load Table definitions and CRUD functions
 ```
+import (
+	"testing"
+
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/ws6/msi"
+)
+
+func TestLoadTables(t *testing.T) {
+
 	schema, err := msi.NewMsi(`mysql`, `username:password@(localhost:3306)/databasename`, `databasename`, ``)
 	if err != nil {
 		t.Fatal()
@@ -57,6 +66,7 @@ Load Table definitions and CRUD functions
 		t.Log(query)
 
 	}
+}
 ```
 
 Build a query from Mongodb flavor
