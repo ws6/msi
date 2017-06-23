@@ -8,6 +8,53 @@ Attempt to achieve the similar interface as mongodb does.
   This will not require generated code, but load the schema from databases. model first instead of code first
   Focus on per table based queries. Joins should still be handled manually.
 ## Usage
+Load Table definitions and CRUD functions
+```
+	schema, err := msi.NewMsi(`mysql`, `username:password@(localhost:3306)/databasename`, `databasename`, ``)
+	if err != nil {
+		t.Fatal()
+	}
+	t.Log(`Total Number of Tables: `, len(schema.Tables))
+	t.Log(`##############`)
+	crit := map[string]interface{}{`id`: 123}
+	updates := map[string]interface{}{`id`: `updated values`}
+	for _, table := range schema.Tables {
+		t.Log(`###`)
+		t.Log(` Table:`, table.TableName, `,`, `number of fields:`, len(table.Fields))
+		table.SelectAll()
+		query, err := table.FindId(123)
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+
+		table.UnSelectAllFields()
+		t.Log(query)
+		query, err = table.Find(crit)
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+
+		t.Log(query)
+		query, err = table.UpdateId(1, updates)
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+		t.Log(query)
+		query, err = table.RemoveId(123)
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+		t.Log(query)
+		query, err = table.Insert(updates)
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+		t.Log(query)
+
+	}
+```
+
+Build a query from Mongodb flavor
 ```
 func TestParseGroupBY(t *testing.T) {
 	where := map[string]interface{}{
