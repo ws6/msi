@@ -16,13 +16,11 @@ type Msi struct {
 }
 
 func (self *Msi) GetTable(tableName string) *Table {
-
 	for _, table := range self.Tables {
 		if table.TableName == tableName {
 			return table
 		}
 	}
-
 	return nil
 }
 

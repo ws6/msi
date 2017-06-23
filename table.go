@@ -29,10 +29,6 @@ type Table struct {
 	Fields    []*Field
 }
 
-var (
-	TABLES = make(map[string]*Table)
-)
-
 func IsNumber(t string) bool {
 
 	if strings.Contains(t, `int`) {
@@ -43,25 +39,6 @@ func IsNumber(t string) bool {
 	}
 	return false
 
-}
-
-func Register(t *Table) {
-
-	for _, f := range t.Fields {
-		if IsNumber(f.Type) {
-			f.IsNumber = true
-		}
-	}
-
-	TABLES[t.TableName] = t
-}
-
-func GetTable(tableName string) *Table {
-	if t, ok := TABLES[tableName]; ok {
-		return t
-	}
-
-	return nil
 }
 
 func (t *Table) SelectAll() {
