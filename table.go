@@ -63,6 +63,29 @@ func GetTable(tableName string) *Table {
 	return nil
 }
 
+func (t *Table) SelectAll() {
+	t.SelectAllFields()
+}
+
+func (t *Table) SelectAllFields() {
+	for _, f := range t.Fields {
+		f.Selected = true
+	}
+}
+
+func (t *Table) UnSelectAllFields() {
+	for _, f := range t.Fields {
+		f.Selected = false
+	}
+}
+
+//fun :)
+func (t *Table) ToggleSelectAllFields() {
+	for _, f := range t.Fields {
+		f.Selected = !f.Selected
+	}
+}
+
 func (t *Table) GetFieldNames() []string {
 	ret := []string{}
 	for _, f := range t.Fields {
@@ -109,7 +132,7 @@ func (t *Table) MakeInsertValues(updates []*NameVal) []string {
 		if _f == nil {
 			continue
 		}
-		_v := Escape(v)
+		_v := v
 
 		if !_f.IsNumber {
 			_v = fmt.Sprintf("'%s'", _v)

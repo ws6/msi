@@ -29,7 +29,32 @@ const (
 	//existence operators
 	EXISTS = `$exists` //if value is true then field is not null; else field is null
 	LIKE   = `$like`
+	//meta query constants
+	FIELDS  = `$fields` // not part of SQL syntax; for overwritting the default field selection
+	OFFSET  = `$offset`
+	LIMIT   = `$limit`
+	GROUPBY = `$groupby`
+	ORDERBY = `$orderby`
 )
+
+func IsMetaQuery(op string) bool {
+	switch op {
+	default:
+		return false
+	case FIELDS:
+		return true
+	case OFFSET:
+		return true
+	case LIMIT:
+		return true
+	case GROUPBY:
+		return true
+	case ORDERBY:
+		return true
+
+	}
+	return false
+}
 
 func ToSQLOperator(op string) string {
 	switch op {
@@ -352,8 +377,61 @@ func (t *Table) SafeWhere(crit map[string]interface{}) (string, error) {
 
 }
 
+type MetaQuery struct {
+	Orderby []string
+	Offset  int
+	Limit   int
+	GroupBy []string
+	Fields  []string
+}
+
+func InterfaceToStringArray(v interface{}) []string {
+	ret := []string{}
+
+	arr, ok := v.([]string)
+	if !ok {
+		return ret
+	}
+
+	for _, s := range arr {
+		ret = append(ret, s)
+	}
+
+	return ret
+}
+
+func ParseMetaQuery(crit map[string]interface{}) (*MetaQuery, error) {
+	ret := new(MetaQuery)
+	for k, v := range crit {
+		if !IsMetaQuery(k) {
+			continue
+		}
+		switch k {
+		case OFFSET:
+			if n, ok := v.(int); ok {
+				ret.Offset = n
+			}
+		case LIMIT:
+			if n, ok := v.(int); ok {
+				ret.Limit = n
+			}
+		case GROUPBY:
+			ret.GroupBy = InterfaceToStringArray(v)
+		case FIELDS:
+			ret.Fields = InterfaceToStringArray(v)
+		case ORDERBY:
+			ret.Orderby = InterfaceToStringArray(v)
+		default:
+			continue
+		}
+	}
+	return ret, nil
+}
+
 //Find filter out bad fields and correct types to make query
-func (t *Table) Find(crit map[string]interface{}) (string, error) {
+//TODO parse secondary map for Groupby and offset limit statemetns
+func (t *Table) Find(others ...map[string]interface{}) (string, error) {
+
 	selectedFields := []string{}
 	for _, field := range t.Fields {
 		if field.Selected {
@@ -365,6 +443,17 @@ func (t *Table) Find(crit map[string]interface{}) (string, error) {
 		selectedFields = []string{`*`} //not sufficient
 	}
 	ret := fmt.Sprintf("SELECT %s FROM %s", strings.Join(selectedFields, ", "), t.TableName)
+
+	if len(others) == 0 {
+		return fmt.Sprintf("%s  ", ret), nil
+	}
+
+	var crit map[string]interface{}
+
+	if len(others) > 0 {
+		crit = others[0]
+	}
+
 	if crit == nil {
 		return fmt.Sprintf("%s  ", ret), nil
 	}
@@ -373,7 +462,40 @@ func (t *Table) Find(crit map[string]interface{}) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf(`%s %s `, ret, whereClause), nil
+	if len(others) == 1 {
+		return fmt.Sprintf(`%s %s `, ret, whereClause), nil
+	}
+
+	//if len(others) > 1 {
+	mq, err := ParseMetaQuery(others[1])
+	if err != nil {
+		return "", err
+	}
+	if len(mq.Fields) > 0 {
+		selectedFields = mq.Fields //!!!overwrite
+	}
+	// like statement will get replaced
+	ret = fmt.Sprintf("SELECT %s FROM %s %s", strings.Join(selectedFields, ", "), t.TableName, whereClause)
+
+	if len(mq.GroupBy) > 0 {
+		//TODO to add field checker?
+		ret = fmt.Sprintf(`%s GROUP BY %s`, ret, strings.Join(mq.GroupBy, " ,"))
+	}
+
+	if len(mq.Orderby) > 0 {
+		ret = fmt.Sprintf(`%s ORDER BY %s`, ret, strings.Join(mq.Orderby, " ,"))
+	}
+
+	if mq.Limit > 0 {
+		ret = fmt.Sprintf(`%s LIMIT %d`, ret, mq.Limit)
+	}
+
+	if mq.Offset > 0 {
+		ret = fmt.Sprintf(`%s OFFSET %d`, ret, mq.Offset)
+	}
+
+	return ret, nil
+
 }
 
 func (t *Table) FindId(id int) (string, error) {

@@ -52,7 +52,7 @@ func Stringify(updates map[string]interface{}) map[string]string {
 
 }
 
-func (t *Table) Insert(_updates map[string]interface{}) string {
+func (t *Table) Insert(_updates map[string]interface{}) (string, error) {
 	//INSERT INTO person (first_name,last_name,email) VALUES (:first,:last,:email)
 
 	updates := []*NameVal{}
@@ -65,6 +65,6 @@ func (t *Table) Insert(_updates map[string]interface{}) string {
 		t.TableName,
 		strings.Join(t.MakeInsertFields(updates), ","),
 		strings.Join(t.MakeInsertValues(updates), ","),
-	)
+	), nil
 
 }

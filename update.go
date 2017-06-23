@@ -20,10 +20,10 @@ func (t *Table) SafeUpdate(updates map[string]interface{}) []string {
 			continue //!!! biased design
 		}
 
-		_v := Escape(v)
+		_v := v
 
 		if !field.IsNumber {
-			_v = fmt.Sprintf("'%s'", _v)
+			_v = fmt.Sprintf("'%s'", Escape(_v))
 		}
 
 		up = append(up, fmt.Sprintf("%s=%s", k, _v))
@@ -33,10 +33,7 @@ func (t *Table) SafeUpdate(updates map[string]interface{}) []string {
 
 func (t *Table) Update(crit, updates map[string]interface{}) (string, error) {
 	up := t.SafeUpdate(updates)
-	ret := fmt.Sprintf(`
-		UPDATE %s SET
-		%s
-	`,
+	ret := fmt.Sprintf(`UPDATE %s SET %s`,
 		t.TableName,
 		strings.Join(up, ", "),
 	)
