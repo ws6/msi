@@ -43,6 +43,7 @@ func NewMsi(driver, dsnString, schema, tableNames string) (*Msi, error) {
 
 		table := new(Table)
 		table.TableName = tbl
+		table.DbName = schema
 		for _, col := range cols {
 			field := &Field{
 				Name:     col.ColumnName,

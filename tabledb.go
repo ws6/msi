@@ -28,7 +28,7 @@ func (self *DbTable) Find(others ...map[string]interface{}) *Stmt {
 }
 
 func (s *Stmt) Count() (int, error) {
-	query, err := s.table.Find(s.others...)
+	query, err := s.table.Count(s.others...)
 	if err != nil {
 		return 0, err
 	}

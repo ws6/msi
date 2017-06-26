@@ -11,6 +11,7 @@ type Field struct {
 	IsNumber bool
 	Length   int
 	Selected bool
+
 	//ported from https://github.com/mijia/modelq, not used in msi
 	JsonMeta        string
 	IsNullable      bool
@@ -25,6 +26,7 @@ type Field struct {
 
 type Table struct {
 	TableName string
+	DbName    string
 	JoinAlias string //used when join queries envoled; for use space
 	Fields    []*Field
 }

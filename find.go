@@ -445,7 +445,7 @@ func (t *Table) find(others ...map[string]interface{}) (selectedFields []string,
 	if len(selectedFields) == 0 {
 		selectedFields = []string{`*`} //not sufficient
 	}
-	nonSelectClause = fmt.Sprintf("FROM %s", t.TableName)
+	nonSelectClause = fmt.Sprintf("FROM %s", fmt.Sprintf("%s.%s", t.DbName, t.TableName))
 
 	if len(others) == 0 {
 		return
