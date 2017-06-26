@@ -5,10 +5,6 @@ import (
 	"strings"
 )
 
-func (t *Table) UpdateId(id int, updates map[string]interface{}) (string, error) {
-	return t.Update(map[string]interface{}{`id`: id}, updates)
-}
-
 func (t *Table) SafeUpdate(updates map[string]interface{}) []string {
 	up := []string{}
 	for k, v := range Stringify(updates) {
