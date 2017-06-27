@@ -356,7 +356,9 @@ func ParseWhere(crit map[string]interface{}, ret *[]*Where, logicOp, compOp, fie
 }
 
 func (t *Table) SafeWhere(crit map[string]interface{}) (string, error) {
-
+	if crit == nil {
+		return "", nil
+	}
 	//build select query
 
 	_wheres, err := ParseCrit(crit)
@@ -405,6 +407,18 @@ func InterfaceToStringArray(v interface{}) []string {
 	return ret
 }
 
+func (t *Table) ParseMetaQuery(crit map[string]interface{}) (*MetaQuery, error) {
+	if crit != nil {
+		return ParseMetaQuery(crit)
+	}
+
+	ret := new(MetaQuery)
+	ret.Limit = t.Limit
+
+	return ret, nil
+
+}
+
 func ParseMetaQuery(crit map[string]interface{}) (*MetaQuery, error) {
 	ret := new(MetaQuery)
 	for k, v := range crit {
@@ -445,7 +459,20 @@ func (t *Table) find(others ...map[string]interface{}) (selectedFields []string,
 	if len(selectedFields) == 0 {
 		selectedFields = []string{`*`} //not sufficient
 	}
-	nonSelectClause = fmt.Sprintf("FROM %s", fmt.Sprintf("%s.%s", t.DbName, t.TableName))
+	getTableName := func() string {
+		if t.Schema == nil {
+
+			return t.TableName
+		}
+
+		return fmt.Sprintf("%s.%s",
+			t.Schema.DatabaseName,
+			t.TableName)
+	}
+
+	nonSelectClause = fmt.Sprintf("FROM %s",
+		getTableName(),
+	)
 
 	if len(others) == 0 {
 		return
@@ -455,10 +482,6 @@ func (t *Table) find(others ...map[string]interface{}) (selectedFields []string,
 
 	if len(others) > 0 {
 		crit = others[0]
-	}
-
-	if crit == nil {
-		return
 	}
 
 	whereClause, _err := t.SafeWhere(crit)
@@ -472,7 +495,7 @@ func (t *Table) find(others ...map[string]interface{}) (selectedFields []string,
 	}
 
 	//if len(others) > 1 {
-	mq, _err := ParseMetaQuery(others[1])
+	mq, _err := t.ParseMetaQuery(others[1])
 	if err != nil {
 		err = _err
 		return
@@ -481,7 +504,7 @@ func (t *Table) find(others ...map[string]interface{}) (selectedFields []string,
 		selectedFields = mq.Fields //!!!overwrite
 	}
 
-	nonSelectClause = fmt.Sprintf("FROM %s  ", t.TableName)
+	nonSelectClause = fmt.Sprintf("FROM %s  ", getTableName())
 
 	//install joins; Please note joins are free form.
 	if len(mq.Joins) > 0 {
@@ -517,7 +540,7 @@ func (t *Table) find(others ...map[string]interface{}) (selectedFields []string,
 }
 
 //Find filter out bad fields and correct types to make query
-func (t *Table) Find(others ...map[string]interface{}) (string, error) {
+func (t *Table) FindQuery(others ...map[string]interface{}) (string, error) {
 
 	selectedFields, nonSelectClause, orderby, limit, offset, err := t.find(others...)
 	if err != nil {
@@ -529,6 +552,11 @@ func (t *Table) Find(others ...map[string]interface{}) (string, error) {
 	if len(orderby) > 0 {
 		ret = fmt.Sprintf(`%s ORDER BY %s`, ret, strings.Join(orderby, " ,"))
 	}
+
+	if limit == 0 {
+		limit = t.Limit //in case not init from NewDb
+	}
+
 	if limit > 0 {
 		ret = fmt.Sprintf(`%s LIMIT %d`, ret, limit)
 	}
@@ -539,15 +567,11 @@ func (t *Table) Find(others ...map[string]interface{}) (string, error) {
 }
 
 //Count the field name out of this query is "count" in lowercase
-func (t *Table) Count(others ...map[string]interface{}) (string, error) {
+func (t *Table) CountQuery(others ...map[string]interface{}) (string, error) {
 
 	_, nonSelectClause, _, _, _, err := t.find(others...)
 	if err != nil {
 		return "", err
 	}
 	return fmt.Sprintf(`SELECT count(*) as count %s`, nonSelectClause), nil
-}
-
-func (t *Table) FindId(id int) (string, error) {
-	return t.Find(map[string]interface{}{`id`: id})
 }

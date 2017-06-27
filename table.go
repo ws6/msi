@@ -5,6 +5,8 @@ import (
 	"strings"
 )
 
+const DEFAULT_LIMIT = 30
+
 type Field struct {
 	Name     string
 	Type     string
@@ -26,7 +28,10 @@ type Field struct {
 
 type Table struct {
 	TableName string
-	DbName    string
+
+	Limit  int
+	Schema *Msi //pointer back to its parent
+
 	JoinAlias string //used when join queries envoled; for use space
 	Fields    []*Field
 }
@@ -72,15 +77,6 @@ func (t *Table) GetFieldNames() []string {
 		ret = append(ret, f.Name)
 	}
 	return ret
-}
-
-func (t *Table) GetField(f string) *Field {
-	for _, field := range t.Fields {
-		if field.Name == f {
-			return field
-		}
-	}
-	return nil
 }
 
 type NameVal struct {

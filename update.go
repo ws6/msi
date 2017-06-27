@@ -27,7 +27,7 @@ func (t *Table) SafeUpdate(updates map[string]interface{}) []string {
 	return up
 }
 
-func (t *Table) Update(crit, updates map[string]interface{}) (string, error) {
+func (t *Table) UpdateQuery(crit, updates map[string]interface{}) (string, error) {
 	up := t.SafeUpdate(updates)
 	ret := fmt.Sprintf(`UPDATE %s SET %s`,
 		t.TableName,

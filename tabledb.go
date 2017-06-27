@@ -2,42 +2,99 @@ package msi
 
 import (
 	"database/sql"
+	"fmt"
+	"log"
+	"strconv"
+	"sync"
+	"time"
 )
-
-type DbTable struct {
-	Db    *sql.DB
-	table *Table
-}
 
 type Stmt struct {
 	query  string
 	Db     *sql.DB
 	err    error
-	count  int
+	total  int
 	others []map[string]interface{}
 	table  *Table
 }
 
-func (self *DbTable) Find(others ...map[string]interface{}) *Stmt {
+//Page one page of results with Total count information
+type Page struct {
+	Total    int
+	Limit    int
+	Offset   int
+	Data     []map[string]interface{}
+	FindErr  error
+	CountErr error
+}
+
+func (self *Table) GetPage(others ...map[string]interface{}) (*Page, error) {
+
+	ret := new(Page)
+	ret.Limit = self.Limit
+	_, _, _, limit, offset, err := self.find(others...)
+	if err != nil {
+		return nil, err
+	}
+
+	if DEBUG {
+		log.Println(`limit->`, limit, `offset->`, offset)
+	}
+
+	if limit != 0 {
+		ret.Limit = limit
+	}
+
+	ret.Offset = offset
+
+	var wg sync.WaitGroup
+
+	wg.Add(2)
+	//This is why we Go, isn't?
+	go func(_wg *sync.WaitGroup) {
+		ret.Data, ret.FindErr = self.Find(others...).Map()
+		_wg.Done()
+	}(&wg)
+	go func(_wg *sync.WaitGroup) {
+		ret.Total, ret.CountErr = self.Find(others...).Count()
+		_wg.Done()
+	}(&wg)
+
+	wg.Wait()
+
+	if ret.FindErr != nil {
+		return nil, fmt.Errorf(`find err: %s`, ret.FindErr.Error())
+	}
+	if ret.CountErr != nil {
+		return nil, fmt.Errorf(`count err: %s`, ret.CountErr.Error())
+	}
+	return ret, nil
+}
+
+func (self *Table) Find(others ...map[string]interface{}) *Stmt {
 	//install configurations
 	ret := new(Stmt)
-	ret.Db = self.Db
+	ret.Db = self.Schema.Db
 	ret.others = others
-	ret.table = self.table
+	ret.table = self
+	ret.total = -1
 	return ret
 }
 
 func (s *Stmt) Count() (int, error) {
-	query, err := s.table.Count(s.others...)
+	query, err := s.table.CountQuery(s.others...)
 	if err != nil {
 		return 0, err
 	}
-
+	if DEBUG {
+		log.Println(query)
+	}
 	rows, err := s.Db.Query(query)
 
 	if err != nil {
 		return 0, err
 	}
+	defer rows.Close()
 
 	var total int
 	for rows.Next() {
@@ -45,25 +102,183 @@ func (s *Stmt) Count() (int, error) {
 		if err != nil {
 			return 0, err
 		}
+		s.total = total
 		return total, nil
 		break
 	}
+
 	return 0, nil
+}
+
+func GetTyped(destType string, i interface{}) interface{} {
+	if i == nil {
+		return "nil"
+	}
+	switch i.(type) {
+	default:
+		return "unknown"
+	case int64:
+		return "int64"
+	case float32:
+		return "float32"
+	case float64:
+		return "float64"
+	case bool:
+		return "bool"
+	case string:
+		return "string"
+	case time.Time:
+		return "time.Time"
+	case []byte:
+		return "[]byte"
+	}
+
+	return "unknown"
+}
+
+func (t *Table) GetField(colName string) *Field {
+
+	for _, f := range t.Fields {
+		if f.Name == colName || fmt.Sprintf("%s.%s", t.TableName, f.Name) == colName {
+			return f
+		}
+	}
+
+	//digging up to entire database
+
+	for _, table := range t.Schema.Tables {
+		for _, f := range table.Fields {
+			if f.Name == colName || fmt.Sprintf("%s.%s", table.TableName, f.Name) == colName {
+				return f
+			}
+		}
+	}
+
+	return nil
+}
+
+func ParseByte(f *Field, b []byte) interface{} {
+	if f == nil {
+		return nil
+	}
+
+	sb := string(b)
+	switch f.Type {
+	default:
+		if DEBUG {
+			log.Panicln(`unsupported type`, f.Name, f.Type, string(b))
+		}
+		return b
+	case `int`:
+		n, _ := strconv.Atoi(sb)
+		return n
+	case `int64`:
+		n, _ := strconv.ParseInt(sb, 10, 64)
+		return n
+	case `float32`:
+		n, _ := strconv.ParseFloat(sb, 32)
+		return float32(n)
+	case `float64`:
+		n, _ := strconv.ParseFloat(sb, 64)
+		return float64(n)
+	case `string`:
+
+		return sb
+	case `bool`:
+		return sb == `true` || sb == `1`
+	case `time.Time`:
+		{
+			t, _ := time.Parse(`2006-01-02 15:04:05`, sb)
+			return t
+		}
+
+	}
+
+	return b
+}
+
+func ParseVal(f *Field, v interface{}) interface{} {
+	if f == nil {
+		return nil
+	}
+
+	if v == nil {
+		return nil
+	}
+
+	switch v.(type) {
+	default:
+		return v
+	case int:
+		if n, ok := v.(int); ok {
+			return n
+		}
+	case int64:
+		if n, ok := v.(int64); ok {
+			return n
+		}
+
+	case float32:
+		if n, ok := v.(float32); ok {
+			return n
+		}
+
+	case float64:
+		if n, ok := v.(float64); ok {
+			return n
+		}
+
+	case bool:
+		if b, ok := v.(bool); ok {
+			return b
+		}
+	case string:
+		if s, ok := v.(string); ok {
+			return s
+		}
+	case time.Time:
+		if s, ok := v.(time.Time); ok {
+			return s
+		}
+
+	case []byte:
+		if bt, ok := v.([]byte); ok {
+
+			return ParseByte(f, bt)
+		}
+
+	}
+
+	return v
+
 }
 
 //Map https://github.com/jmoiron/sqlx/blob/master/sqlx.go#L820
 
 func (s *Stmt) Map() ([]map[string]interface{}, error) {
-	query, err := s.table.Find(s.others...)
+	query, err := s.table.FindQuery(s.others...)
+	if err != nil {
+		return nil, err
+	}
+	if DEBUG {
+		log.Println(query)
+	}
+
+	rows, err := s.Db.Query(query)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := s.Db.Query(query)
-
+	defer rows.Close()
 	columns, err := rows.Columns()
 	if err != nil {
 		return nil, err
+	}
+
+	colMap := make(map[string]*Field)
+
+	for _, col := range columns {
+		colMap[col] = s.table.GetField(col)
 	}
 
 	ret := []map[string]interface{}{}
@@ -79,6 +294,11 @@ func (s *Stmt) Map() ([]map[string]interface{}, error) {
 		dest := make(map[string]interface{})
 		for i, column := range columns {
 			dest[column] = *(values[i].(*interface{}))
+
+			if field, ok := colMap[column]; ok {
+				dest[column] = ParseVal(field, dest[column])
+			}
+
 		}
 		ret = append(ret, dest)
 	}
@@ -86,36 +306,38 @@ func (s *Stmt) Map() ([]map[string]interface{}, error) {
 	return ret, rows.Err()
 }
 
-func (self *DbTable) Insert(_updates map[string]interface{}) error {
-	query, err := self.table.Insert(_updates)
+func (self *Table) Insert(_updates map[string]interface{}) error {
+	query, err := self.InsertQuery(_updates)
 	if err != nil {
 		return err
 	}
-	_, err = self.Db.Exec(query)
+	if DEBUG {
+		log.Println(query)
+	}
+	_, err = self.Schema.Db.Exec(query)
 	return err
 }
 
-func (self *DbTable) Update(crit, updates map[string]interface{}) error {
-	query, err := self.table.Update(crit, updates)
+func (self *Table) Update(crit, updates map[string]interface{}) error {
+	query, err := self.UpdateQuery(crit, updates)
 	if err != nil {
 		return err
 	}
-	_, err = self.Db.Exec(query)
+	if DEBUG {
+		log.Println(query)
+	}
+	_, err = self.Schema.Db.Exec(query)
 	return err
 }
-func (self *DbTable) UpdateId(id int, updates map[string]interface{}) error {
-	return self.Update(map[string]interface{}{`id`: id}, updates)
-}
 
-func (self *DbTable) Remove(crit map[string]interface{}) error {
-	query, err := self.table.Remove(crit)
+func (self *Table) Remove(crit map[string]interface{}) error {
+	query, err := self.RemoveQuery(crit)
 	if err != nil {
 		return err
 	}
-	_, err = self.Db.Exec(query)
+	if DEBUG {
+		log.Println(query)
+	}
+	_, err = self.Schema.Db.Exec(query)
 	return err
-}
-
-func (self *DbTable) RemoveId(id int) error {
-	return self.Remove(map[string]interface{}{`id`: id})
 }

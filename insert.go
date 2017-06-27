@@ -52,7 +52,7 @@ func Stringify(updates map[string]interface{}) map[string]string {
 
 }
 
-func (t *Table) Insert(_updates map[string]interface{}) (string, error) {
+func (t *Table) InsertQuery(_updates map[string]interface{}) (string, error) {
 	//INSERT INTO person (first_name,last_name,email) VALUES (:first,:last,:email)
 
 	updates := []*NameVal{}
