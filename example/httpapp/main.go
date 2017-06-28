@@ -32,8 +32,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	urlSplit := strings.Split(r.URL.Path, "/")
 	tablename := ""
 	idStr := ""
-	if len(urlSplit) > 0 {
-		tablename = urlSplit[0]
+	if len(urlSplit) > 1 {
+		tablename = urlSplit[1]
 	}
 
 	table := db.GetTable(tablename)
@@ -42,8 +42,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(urlSplit) > 1 {
-		idStr = urlSplit[1]
+	if len(urlSplit) > 2 {
+		idStr = urlSplit[2]
 	}
 
 	if r.Method == http.MethodGet {
@@ -70,7 +70,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if r.Method == http.MethodPut { //update
+	if r.Method == http.MethodPut || r.Method == http.MethodPost { //update
 		body, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			fmt.Fprintf(w, err.Error())
@@ -81,14 +81,22 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, err.Error())
 			return
 		}
-
-		if err := table.Update(msi.M{`id`: idStr}, updates); err != nil {
-			fmt.Fprintf(w, err.Error())
+		if r.Method == http.MethodPut {
+			if err := table.Update(msi.M{`id`: idStr}, updates); err != nil {
+				fmt.Fprintf(w, err.Error())
+				return
+			}
+			fmt.Fprintf(w, `Updated`)
 			return
 		}
-
-		fmt.Fprintf(w, `Updated`)
-		return
+		if r.Method == http.MethodPost {
+			if err := table.Insert(updates); err != nil {
+				fmt.Fprintf(w, err.Error())
+				return
+			}
+			fmt.Fprintf(w, `Created`)
+			return
+		}
 	}
 
 }
