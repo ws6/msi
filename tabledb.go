@@ -242,8 +242,17 @@ func ParseByte(f *Field, b []byte) interface{} {
 		return sb == `true` || sb == `1`
 	case `time.Time`:
 		{
-			t, _ := time.Parse(`2006-01-02 15:04:05`, sb)
-			return t
+			formats := []string{`2006-01-02 15:04:05`, `2006-01-02`}
+			for _, format := range formats {
+				t, err := time.Parse(format, sb)
+				if err != nil {
+					if DEBUG {
+						log.Println(`wrong time formatter`, f.Name, f.Type, sb)
+					}
+					continue
+				}
+				return t
+			}
 		}
 
 	}
