@@ -10,7 +10,7 @@ Attempt to achieve the similar interface as mongodb does.
 ## Usage
 Please check example/example.go as standablone library
 
-example/beegoap is a simple example with CRUD out of the box using beego framework.
+example/beegoapp is a simple example with CRUD out of the box using beego framework.
 
-TODO barefoot http app using msi lib****
+TODO barefoot http app using msi lib
  
