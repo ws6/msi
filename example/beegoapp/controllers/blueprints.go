@@ -57,7 +57,7 @@ func MakeFindFunc(c *BlueprintsController, others ...map[string]interface{}) fun
 			others = append(others, metaQuery)
 		}
 
-		founds, err := table.Find(others...).Map()
+		founds, err := table.GetPage(others...)
 		if err != nil {
 			serverError(c.Ctx, err.Error())
 			return
