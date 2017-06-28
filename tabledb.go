@@ -81,6 +81,60 @@ func (self *Table) Find(others ...map[string]interface{}) *Stmt {
 	return ret
 }
 
+func (s *Stmt) Chan(limit int) chan map[string]interface{} {
+	ret := make(chan map[string]interface{}, limit*3) //!!! three times bigger than limit
+
+	metaQuery := map[string]interface{}{
+		LIMIT: limit, OFFSET: 0,
+	}
+	if len(s.others) == 0 {
+		s.others = append(s.others, nil)
+	}
+
+	if len(s.others) == 1 {
+		s.others = append(s.others, metaQuery)
+	}
+
+	if _, ok := s.others[1][LIMIT]; !ok {
+		s.others[1][LIMIT] = limit
+	}
+	if _, ok := s.others[1][OFFSET]; !ok {
+		s.others[1][OFFSET] = 0
+	}
+
+	go func() {
+		offset, ok := s.others[1][OFFSET].(int)
+		if !ok {
+			offset = 0
+		}
+		defer close(ret)
+
+		for {
+			results, err := s.Map()
+			offset += limit
+			s.others[1][OFFSET] = offset
+
+			if err != nil {
+				if DEBUG {
+					log.Panicln(err.Error())
+				}
+				break
+			}
+
+			if len(results) == 0 {
+				break
+			}
+
+			for _, result := range results {
+				ret <- result
+			}
+		}
+
+	}()
+
+	return ret
+}
+
 func (s *Stmt) Count() (int, error) {
 	query, err := s.table.CountQuery(s.others...)
 	if err != nil {

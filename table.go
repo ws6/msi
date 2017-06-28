@@ -119,3 +119,12 @@ func (t *Table) MakeInsertValues(updates []*NameVal) []string {
 
 	return ret
 }
+
+func (t *Table) GetTypeMap() map[string]string { //filename->type
+	ret := make(map[string]string)
+	for _, f := range t.Fields {
+		ret[f.Name] = f.Type
+	}
+
+	return ret
+}
