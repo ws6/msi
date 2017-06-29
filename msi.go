@@ -14,9 +14,21 @@ var (
 
 type M map[string]interface{}
 
+type BeforeUpdate func(crit M, updates M) error
+type BeforeRemove func(crit M) error
+type BeforeFind func(others ...map[string]interface{}) error
+type BeforeCreate func(updates M) error
+
+type LifeCycle struct {
+	BeforeUpdates []BeforeUpdate
+	BeforeRemoves []BeforeRemove
+	BeforeFinds   []BeforeFind
+	BeforeCreates []BeforeCreate
+}
+
 type Msi struct {
 	Tables []*Table
-
+	*LifeCycle
 	Db           *sql.DB
 	DsnString    string //mysql or postgre
 	DatabaseName string //database name or schema in postgres

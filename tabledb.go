@@ -73,7 +73,26 @@ func (self *Table) GetPage(others ...map[string]interface{}) (*Page, error) {
 
 func (self *Table) Find(others ...map[string]interface{}) *Stmt {
 	//install configurations
+
 	ret := new(Stmt)
+
+	if self.Schema != nil && self.Schema.LifeCycle != nil {
+		for _, f := range self.Schema.LifeCycle.BeforeFinds {
+			if err := f(others...); err != nil {
+				ret.err = err
+			}
+
+		}
+	}
+
+	if self.LifeCycle != nil {
+		for _, f := range self.LifeCycle.BeforeFinds {
+			if err := f(others...); err != nil {
+				ret.err = err
+			}
+
+		}
+	}
 	ret.Db = self.Schema.Db
 	ret.others = others
 	ret.table = self
@@ -136,6 +155,10 @@ func (s *Stmt) Chan(limit int) chan map[string]interface{} {
 }
 
 func (s *Stmt) Count() (int, error) {
+	if s.err != nil {
+		return 0, s.err
+	}
+
 	query, err := s.table.CountQuery(s.others...)
 	if err != nil {
 		return 0, err
@@ -243,15 +266,20 @@ func ParseByte(f *Field, b []byte) interface{} {
 	case `time.Time`:
 		{
 			formats := []string{`2006-01-02 15:04:05`, `2006-01-02`}
+			var err error
+			var t time.Time
 			for _, format := range formats {
-				t, err := time.Parse(format, sb)
-				if err != nil {
-					if DEBUG {
-						log.Println(`wrong time formatter`, f.Name, f.Type, sb)
-					}
-					continue
+				t, err = time.Parse(format, sb)
+				if err == nil {
+					return t
 				}
-				return t
+
+			}
+			if err != nil {
+				if DEBUG {
+					log.Println(`wrong time formatter`, f.Name, f.Type, sb, err.Error())
+				}
+
 			}
 		}
 
@@ -319,6 +347,10 @@ func ParseVal(f *Field, v interface{}) interface{} {
 //Map https://github.com/jmoiron/sqlx/blob/master/sqlx.go#L820
 
 func (s *Stmt) Map() ([]map[string]interface{}, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+
 	query, err := s.table.FindQuery(s.others...)
 	if err != nil {
 		return nil, err
@@ -370,6 +402,25 @@ func (s *Stmt) Map() ([]map[string]interface{}, error) {
 }
 
 func (self *Table) Insert(_updates map[string]interface{}) error {
+
+	if self.Schema != nil && self.Schema.LifeCycle != nil {
+		for _, f := range self.Schema.LifeCycle.BeforeCreates {
+			if err := f(_updates); err != nil {
+				return err
+			}
+
+		}
+	}
+
+	if self.LifeCycle != nil {
+		for _, f := range self.LifeCycle.BeforeCreates {
+			if err := f(_updates); err != nil {
+				return err
+			}
+
+		}
+	}
+
 	query, err := self.InsertQuery(_updates)
 	if err != nil {
 		return err
@@ -382,6 +433,25 @@ func (self *Table) Insert(_updates map[string]interface{}) error {
 }
 
 func (self *Table) Update(crit, updates map[string]interface{}) error {
+
+	if self.Schema != nil && self.Schema.LifeCycle != nil {
+		for _, f := range self.Schema.LifeCycle.BeforeUpdates {
+			if err := f(crit, updates); err != nil {
+				return err
+			}
+
+		}
+	}
+
+	if self.LifeCycle != nil {
+		for _, f := range self.LifeCycle.BeforeUpdates {
+			if err := f(crit, updates); err != nil {
+				return err
+			}
+
+		}
+	}
+
 	query, err := self.UpdateQuery(crit, updates)
 	if err != nil {
 		return err
@@ -394,6 +464,24 @@ func (self *Table) Update(crit, updates map[string]interface{}) error {
 }
 
 func (self *Table) Remove(crit map[string]interface{}) error {
+
+	if self.Schema != nil && self.Schema.LifeCycle != nil {
+		for _, f := range self.Schema.LifeCycle.BeforeRemoves {
+			if err := f(crit); err != nil {
+				return err
+			}
+
+		}
+	}
+
+	if self.LifeCycle != nil {
+		for _, f := range self.LifeCycle.BeforeRemoves {
+			if err := f(crit); err != nil {
+				return err
+			}
+
+		}
+	}
 	query, err := self.RemoveQuery(crit)
 	if err != nil {
 		return err

@@ -36,7 +36,7 @@ func InterfaceToString(i interface{}) string {
 	}
 
 	if s, ok := i.(time.Time); ok {
-		return fmt.Sprintf("'%s'", Escape(s.String())) //TODO to be better formatted
+		return fmt.Sprintf("'%4d-%2d-%2d %2d:%2d:%2d'", s.Year(), s.Month(), s.Day(), s.Hour(), s.Minute(), s.Second()) //TODO to be better formatted
 	}
 	return ""
 }

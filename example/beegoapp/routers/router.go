@@ -27,7 +27,7 @@ func init() {
 	beego.Router("/api/blueprints/:tablename/:id",
 		&controllers.BlueprintsController{},
 		"delete:RemoveId")
-	beego.Router("/api/blueprints/:tablename/:id",
+	beego.Router("/api/blueprints/:tablename",
 		&controllers.BlueprintsController{},
 		"post:Create")
 

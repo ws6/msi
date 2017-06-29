@@ -27,10 +27,10 @@ type Field struct {
 }
 
 type Table struct {
-	TableName string
-
-	Limit  int
-	Schema *Msi //pointer back to its parent
+	TableName  string
+	*LifeCycle //lifecycle events
+	Limit      int
+	Schema     *Msi //pointer back to its parent
 
 	JoinAlias string //used when join queries envoled; for use space
 	Fields    []*Field
@@ -132,7 +132,14 @@ func (t *Table) MakeInsertValues(updates []*NameVal) []string {
 		_v := v
 
 		if !_f.IsNumber {
-			_v = fmt.Sprintf("'%s'", _v)
+			_v = fmt.Sprintf("%s", _v)
+		}
+		if _f.Type == "time.Time" {
+			if DEBUG {
+				fmt.Println(_f.Name, _f.Type, _v)
+
+			}
+
 		}
 
 		ret = append(ret, _v)

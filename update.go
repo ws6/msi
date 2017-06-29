@@ -19,7 +19,7 @@ func (t *Table) SafeUpdate(updates map[string]interface{}) []string {
 		_v := v
 
 		if !field.IsNumber {
-			_v = fmt.Sprintf("'%s'", Escape(_v))
+			_v = fmt.Sprintf("%s", _v)
 		}
 
 		up = append(up, fmt.Sprintf("%s=%s", k, _v))

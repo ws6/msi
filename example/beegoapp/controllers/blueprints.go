@@ -96,7 +96,7 @@ func (c *BlueprintsController) Update() {
 
 	//How simple to use generic map[string]interface{} and without worry about empty type v.s. null
 	updates := make(map[string]interface{})
-	if err := json.Unmarshal(c.Ctx.Input.RequestBody, updates); err != nil {
+	if err := json.Unmarshal(c.Ctx.Input.RequestBody, &updates); err != nil {
 		badRequest(c.Ctx, err.Error())
 		return
 	}
@@ -137,7 +137,7 @@ func (c *BlueprintsController) Create() {
 
 	//How simple
 	toCreate := make(map[string]interface{})
-	if err := json.Unmarshal(c.Ctx.Input.RequestBody, toCreate); err != nil {
+	if err := json.Unmarshal(c.Ctx.Input.RequestBody, &toCreate); err != nil {
 		badRequest(c.Ctx, err.Error())
 		return
 	}
