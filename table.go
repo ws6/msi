@@ -52,6 +52,27 @@ func (t *Table) SelectAll() {
 	t.SelectAllFields()
 }
 
+func (t *Table) _select(s bool, fields ...string) {
+	if t == nil {
+		return // for chainning success
+	}
+
+	for _, field := range fields {
+		if f := t.GetField(field); f != nil {
+			f.Selected = s
+		}
+
+	}
+}
+
+func (t *Table) Select(fields ...string) {
+	t._select(true, fields...)
+}
+
+func (t *Table) UnSelect(fields ...string) {
+	t._select(false, fields...)
+}
+
 func (t *Table) SelectAllFields() {
 	for _, f := range t.Fields {
 		f.Selected = true

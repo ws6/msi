@@ -19,10 +19,12 @@ func getConfigString() string {
 }
 
 func init() {
+
 	schema, err := msi.NewDb(`mysql`, getConfigString(), `sage`, ``)
 	if err != nil {
 		panic(err.Error())
 	}
+	schema.GetTable(`flowcell`).Select(`id`, `run_start_date`, `run_id`, `cif_first`, `cif_latest`, `instrument_type`)
 	_schema = schema
 }
 

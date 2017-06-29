@@ -49,13 +49,13 @@ var (
 )
 
 type QueryParams struct {
-	Limit        int64
-	Skip         int64
-	Fields       map[string]int `json:"-"`
-	Or           bool
-	Critiera     map[string]interface{}
-	SortBy       []string
-	GroupCountBy []string
+	Limit    int
+	Skip     int
+	Fields   map[string]int `json:"-"`
+	Or       bool
+	Critiera map[string]interface{}
+	SortBy   []string
+	GroupBy  []string
 }
 
 func IsAtomicKinds(k reflect.Kind) bool {
@@ -372,38 +372,38 @@ func Build(c CanGet, fieldMap map[string]string) (*QueryParams, error) {
 	if err != nil {
 		return nil, err
 	}
-	if limit := c.Get(`limit`); limit != "" {
-		ret.Limit, err = strconv.ParseInt(limit, 10, 64)
+	if limit := c.Get(`_limit`); limit != "" {
+		ret.Limit, err = strconv.Atoi(limit)
 		if err != nil {
 			return nil, fmt.Errorf(`parse Limit error ` + err.Error())
 		}
 	}
-	if skip := c.Get(`skip`); skip != "" {
-		ret.Skip, err = strconv.ParseInt(skip, 10, 64)
+	if skip := c.Get(`_skip`); skip != "" {
+		ret.Skip, err = strconv.Atoi(skip)
 		if err != nil {
 			return nil, fmt.Errorf(`parse skip error ` + err.Error())
 		}
 	}
-	if sortBy := c.Get(`sortby`); sortBy != "" {
+	if sortBy := c.Get(`_sortby`); sortBy != "" {
 		ret.SortBy = strings.Split(sortBy, ",")
 		if err != nil {
 			return nil, fmt.Errorf(`parse sortby error ` + err.Error())
 		}
 	}
 
-	if groupCountBy := c.Get(`groupcountby`); groupCountBy != "" {
-		ret.GroupCountBy = strings.Split(groupCountBy, ",")
+	if groupCountBy := c.Get(`_groupby`); groupCountBy != "" {
+		ret.GroupBy = strings.Split(groupCountBy, ",")
 		if err != nil {
 			return nil, fmt.Errorf(`parse groupcountby error ` + err.Error())
 		}
 	}
 
-	if fields := c.Get(`fields`); fields != "" {
+	if fields := c.Get(`_fields`); fields != "" {
 		fs := strings.Split(fields, ",")
 		ret.Fields = make(map[string]int)
 		for _, f := range fs {
 			if _, ok := fieldMap[f]; !ok {
-				return nil, fmt.Errorf(`fields is not in struct fields ` + f)
+				return nil, fmt.Errorf(`%s is not in allowed field type map `, f)
 			}
 			ret.Fields[f] = 1
 		}

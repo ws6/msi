@@ -38,9 +38,10 @@ func MakeFindFunc(c *BlueprintsController, others ...map[string]interface{}) fun
 		}
 
 		if len(others) == 0 {
+
+			//check test from querybuilder.Build
+
 			typeMap := table.GetTypeMap()
-			//querybuilder.Build can make a url query into msi interface
-			// ?field=abc&field1=$in:1,2,3&limit=100&offset=25
 			qb, err := querybuilder.Build(c.Input(), typeMap)
 			if err != nil {
 				badRequest(c.Ctx, "querybuilder.Build Err: "+err.Error())
@@ -49,11 +50,16 @@ func MakeFindFunc(c *BlueprintsController, others ...map[string]interface{}) fun
 
 			crit := qb.Critiera
 			others = append(others, crit)
+			fmt.Printf("%+v", crit)
 			metaQuery := map[string]interface{}{
-				`$limit`:   qb.Limit,
-				`$offset`:  qb.Skip,
-				`$orderby`: qb.SortBy,
+				msi.LIMIT:   qb.Limit,
+				msi.OFFSET:  qb.Skip,
+				msi.ORDERBY: qb.SortBy,
+				msi.GROUPBY: qb.GroupBy,
+				//msi.FIELDS:  qb.Fields,
 			}
+
+			fmt.Printf("%+v", metaQuery)
 			others = append(others, metaQuery)
 		}
 

@@ -2,6 +2,8 @@ package msi
 
 import (
 	"fmt"
+	"log"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -408,6 +410,9 @@ func InterfaceToStringArray(v interface{}) []string {
 }
 
 func (t *Table) ParseMetaQuery(crit map[string]interface{}) (*MetaQuery, error) {
+	if DEBUG {
+		log.Printf("other[1] %+v", crit)
+	}
 	if crit != nil {
 		return ParseMetaQuery(crit)
 	}
@@ -427,13 +432,35 @@ func ParseMetaQuery(crit map[string]interface{}) (*MetaQuery, error) {
 		}
 		switch k {
 		case OFFSET:
-			if n, ok := v.(int); ok {
+			n, ok := v.(int)
+			if ok {
 				ret.Offset = n
 			}
+			n64, ok := v.(int64)
+			if ok {
+				ret.Offset = int(n64)
+			}
+			if s, ok := v.(string); ok {
+
+				ret.Offset, _ = strconv.Atoi(s)
+
+			}
+			if DEBUG && ret.Offset == 0 {
+				if !ok {
+					log.Panicln(`offset is not int`, v)
+				}
+			}
 		case LIMIT:
-			if n, ok := v.(int); ok {
+			n, ok := v.(int)
+			if ok {
 				ret.Limit = n
 			}
+			if DEBUG {
+				if !ok {
+					log.Panicln(`limit is not int`)
+				}
+			}
+
 		case GROUPBY:
 			ret.GroupBy = InterfaceToStringArray(v)
 		case FIELDS:
@@ -500,6 +527,11 @@ func (t *Table) find(others ...map[string]interface{}) (selectedFields []string,
 		err = _err
 		return
 	}
+
+	if DEBUG {
+		log.Printf("%+v", mq)
+	}
+
 	if len(mq.Fields) > 0 {
 		selectedFields = mq.Fields //!!!overwrite
 	}
