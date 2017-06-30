@@ -17,6 +17,10 @@ type M map[string]interface{}
 type BeforeUpdate func(crit M, updates M) error
 type BeforeRemove func(crit M) error
 type BeforeFind func(others ...map[string]interface{}) error
+
+//function called on Find().Map()
+type AfterFind func(results []map[string]interface{}) error // for the purpose of overwrite/block some fields
+//e.g. userpassword->null
 type BeforeCreate func(updates M) error
 
 type LifeCycle struct {
@@ -24,11 +28,12 @@ type LifeCycle struct {
 	BeforeRemoves []BeforeRemove
 	BeforeFinds   []BeforeFind
 	BeforeCreates []BeforeCreate
+	AfterFinds    []AfterFind
 }
 
 type Msi struct {
-	Tables []*Table
-	*LifeCycle
+	Tables       []*Table
+	*LifeCycle   //global lifecycle; note there is a table level lifecycle as well
 	Db           *sql.DB
 	DsnString    string //mysql or postgre
 	DatabaseName string //database name or schema in postgres
@@ -56,6 +61,7 @@ func (self *Msi) Close() error {
 //NewDb(`mysql`, `rw_sage:Exxxc0ndid0@(ussd-prd-mysq01:3306)/sage`, `sage`,``)
 func NewDb(driver, dsnString, schema, tableNames string) (*Msi, error) {
 	ret := new(Msi)
+	ret.LifeCycle = new(LifeCycle)
 	ret.DatabaseName = schema
 	dbSchema, err := drivers.LoadDatabaseSchema(driver, dsnString, schema, tableNames)
 
@@ -72,6 +78,7 @@ func NewDb(driver, dsnString, schema, tableNames string) (*Msi, error) {
 	for tbl, cols := range dbSchema {
 
 		table := new(Table)
+		table.LifeCycle = new(LifeCycle)
 		table.TableName = tbl
 		table.Schema = ret
 		table.Limit = DEFAULT_LIMIT

@@ -398,7 +398,31 @@ func (s *Stmt) Map() ([]map[string]interface{}, error) {
 		ret = append(ret, dest)
 	}
 
-	return ret, rows.Err()
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+
+	if s.table != nil {
+		if s.table.Schema != nil && s.table.Schema.LifeCycle != nil {
+			for _, f := range s.table.Schema.LifeCycle.AfterFinds {
+				if err := f(ret); err != nil {
+					return nil, err
+				}
+
+			}
+		}
+
+		if s.table.LifeCycle != nil {
+			for _, f := range s.table.LifeCycle.AfterFinds {
+				if err := f(ret); err != nil {
+					return nil, err
+				}
+
+			}
+		}
+	}
+
+	return ret, nil
 }
 
 func (self *Table) Insert(_updates map[string]interface{}) error {
