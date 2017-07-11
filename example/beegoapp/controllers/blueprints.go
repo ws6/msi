@@ -42,12 +42,15 @@ func MakeFindFunc(c *BlueprintsController, others ...map[string]interface{}) fun
 			//check test from querybuilder.Build
 
 			typeMap := table.GetTypeMap()
+			if table.TableName == `flowcell` { //TODO allow typeMape overwrite
+				typeMap[`project_id`] = `int`
+			}
 			qb, err := querybuilder.Build(c.Input(), typeMap)
 			if err != nil {
 				badRequest(c.Ctx, "querybuilder.Build Err: "+err.Error())
 				return
 			}
-
+			fmt.Println("qb -> %+v", qb)
 			crit := qb.Critiera
 			others = append(others, crit)
 			fmt.Printf("%+v", crit)

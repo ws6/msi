@@ -13,6 +13,7 @@ import (
 //only try one level
 
 const (
+	UNLIMIT = -1
 	//logical operators
 	AND = `$and`
 	OR  = `$or`
@@ -31,12 +32,13 @@ const (
 	EXISTS = `$exists` //if value is true then field is not null; else field is null
 	LIKE   = `$like`
 	//meta query constants
-	FIELDS  = `$fields` // not part of SQL syntax; for overwritting the default field selection
-	JOINS   = `$joins`  // not part of SQL syntax
-	OFFSET  = `$offset`
-	LIMIT   = `$limit`
-	GROUPBY = `$groupby`
-	ORDERBY = `$orderby`
+	FIELDS    = `$fields`    // not part of SQL syntax; for overwritting the default field selection
+	JOINS     = `$joins`     // not part of SQL syntax
+	POPULATES = `$populates` // not part of SQL syntax; accept array of strings; if each field has foreign fields specified will use other wise, use all foreign fields  ["field1:foreign_field1,foreign_field2", "field2" ]
+	OFFSET    = `$offset`
+	LIMIT     = `$limit`
+	GROUPBY   = `$groupby`
+	ORDERBY   = `$orderby`
 )
 
 func IsMetaQuery(op string) bool {
@@ -385,12 +387,13 @@ func (t *Table) SafeWhere(crit map[string]interface{}) (string, error) {
 }
 
 type MetaQuery struct {
-	Orderby []string
-	Offset  int
-	Limit   int
-	GroupBy []string
-	Fields  []string
-	Joins   []string
+	Orderby   []string
+	Offset    int
+	Limit     int
+	GroupBy   []string
+	Fields    []string
+	Joins     []string
+	Populates []string
 }
 
 func InterfaceToStringArray(v interface{}) []string {
@@ -454,6 +457,9 @@ func ParseMetaQuery(crit map[string]interface{}) (*MetaQuery, error) {
 			ret.Orderby = InterfaceToStringArray(v)
 		case JOINS:
 			ret.Joins = InterfaceToStringArray(v)
+			//TODO support auto join $join:[{tablename:[selected_forgein_table_fields]}]
+		case POPULATES:
+			ret.Populates = InterfaceToStringArray(v)
 		default:
 			continue
 		}
@@ -468,9 +474,12 @@ func (t *Table) find(others ...map[string]interface{}) (selectedFields []string,
 		}
 	}
 
-	if len(selectedFields) == 0 {
-		selectedFields = []string{`*`} //not sufficient
-	}
+	defer func() {
+		if len(selectedFields) == 0 {
+			selectedFields = []string{`*`} //not sufficient
+		}
+	}()
+
 	getTableName := func() string {
 		if t.Schema == nil {
 
@@ -528,6 +537,68 @@ func (t *Table) find(others ...map[string]interface{}) (selectedFields []string,
 		//TODO adding joins
 		nonSelectClause = fmt.Sprintf("%s  %s", nonSelectClause, strings.Join(mq.Joins, " "))
 	}
+
+	if len(mq.Populates) > 0 {
+		//install populates left joins
+		leftjoins := []string{}
+		for _, populate := range mq.Populates {
+			_sp := strings.Split(populate, ":")
+			if len(_sp) == 0 {
+				continue
+			}
+
+			fieldName := _sp[0]
+
+			field := t.GetField(fieldName)
+			if field == nil {
+				err = fmt.Errorf(`no field name [%s] found from table [%s]`, fieldName, t.TableName)
+				return
+			}
+			//check foreignkey associations
+			if field.ReferencedTable == nil || field.ReferencedField == nil {
+				err = fmt.Errorf(`no foreign table or  foreign field installed for col [%s]`, fieldName)
+				return
+			}
+
+			leftjoins = append(leftjoins,
+				fmt.Sprintf(` left join %s on %s.%s = %s.%s `,
+					field.ReferencedTable.TableName,
+					field.ReferencedTable.TableName,
+					field.ReferencedField.Name,
+					t.TableName, fieldName,
+				),
+			)
+
+			foreignFields := []string{}
+			if len(_sp) > 1 {
+				//rest are selected foreign cols
+				_cols := strings.Split(_sp[1], ",")
+				for _, _col := range _cols {
+
+					foreignField := field.ReferencedTable.GetField(_col)
+					if foreignField == nil {
+						err = fmt.Errorf(`no foreign field found [%s]`, _col)
+						return
+					}
+					foreignFields = append(foreignFields, foreignField.FullName())
+				}
+			}
+
+			if len(foreignFields) == 0 {
+				//use all foreign table fields
+				for _, field := range field.ReferencedTable.Fields {
+					foreignFields = append(foreignFields, field.FullName())
+				}
+			}
+
+			for _, k := range foreignFields {
+				selectedFields = append(selectedFields, k)
+			}
+		}
+
+		nonSelectClause = fmt.Sprintf("%s  %s", nonSelectClause, strings.Join(leftjoins, " "))
+	}
+
 	//install nonSelectClause
 	nonSelectClause = fmt.Sprintf("%s %s", nonSelectClause, whereClause)
 

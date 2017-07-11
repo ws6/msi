@@ -8,11 +8,15 @@ import (
 const DEFAULT_LIMIT = 30
 
 type Field struct {
+	table    *Table
 	Name     string
 	Type     string
 	IsNumber bool
 	Length   int
 	Selected bool
+
+	ReferencedTable *Table
+	ReferencedField *Field
 
 	//ported from https://github.com/mijia/modelq, not used in msi
 	JsonMeta        string
@@ -24,6 +28,14 @@ type Field struct {
 	DefaultValue    string
 	Extra           string
 	Comment         string
+}
+
+func (self *Field) FullName() string {
+	if self.table == nil {
+		return self.Name
+	}
+
+	return fmt.Sprintf("%s.%s", self.table.TableName, self.Name)
 }
 
 type Table struct {

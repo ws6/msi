@@ -23,9 +23,9 @@ type Page struct {
 	Total    int
 	Limit    int
 	Offset   int
-	Data     []map[string]interface{}
 	FindErr  error
 	CountErr error
+	Data     []map[string]interface{}
 }
 
 func (self *Table) GetPage(others ...map[string]interface{}) (*Page, error) {
@@ -234,16 +234,13 @@ func (t *Table) GetField(colName string) *Field {
 	return nil
 }
 
-func ParseByte(f *Field, b []byte) interface{} {
-	if f == nil {
-		return nil
-	}
+func ParseByte(_type string, b []byte) interface{} {
 
 	sb := string(b)
-	switch f.Type {
+	switch _type {
 	default:
 		if DEBUG {
-			log.Panicln(`unsupported type`, f.Name, f.Type, string(b))
+			log.Panicln(`unsupported type`, _type, string(b))
 		}
 		return b
 	case `int`:
@@ -277,7 +274,7 @@ func ParseByte(f *Field, b []byte) interface{} {
 			}
 			if err != nil {
 				if DEBUG {
-					log.Println(`wrong time formatter`, f.Name, f.Type, sb, err.Error())
+					log.Println(`wrong time formatter`, _type, sb, err.Error())
 				}
 
 			}
@@ -288,10 +285,10 @@ func ParseByte(f *Field, b []byte) interface{} {
 	return b
 }
 
-func ParseVal(f *Field, v interface{}) interface{} {
-	if f == nil {
-		return nil
-	}
+func ParseVal(_type string, v interface{}) interface{} {
+	//	if f == nil {
+	//		return nil
+	//	}
 
 	if v == nil {
 		return nil
@@ -335,7 +332,7 @@ func ParseVal(f *Field, v interface{}) interface{} {
 	case []byte:
 		if bt, ok := v.([]byte); ok {
 
-			return ParseByte(f, bt)
+			return ParseByte(_type, bt)
 		}
 
 	}
@@ -347,10 +344,11 @@ func ParseVal(f *Field, v interface{}) interface{} {
 //Map https://github.com/jmoiron/sqlx/blob/master/sqlx.go#L820
 
 func (s *Stmt) Map() ([]map[string]interface{}, error) {
+
 	if s.err != nil {
 		return nil, s.err
 	}
-
+	typemap := s.table.GetTypeMap()
 	query, err := s.table.FindQuery(s.others...)
 	if err != nil {
 		return nil, err
@@ -358,48 +356,10 @@ func (s *Stmt) Map() ([]map[string]interface{}, error) {
 	if DEBUG {
 		log.Println(query)
 	}
+	ret, err := Map(s.Db, query, typemap)
 
-	rows, err := s.Db.Query(query)
 	if err != nil {
 		return nil, err
-	}
-
-	defer rows.Close()
-	columns, err := rows.Columns()
-	if err != nil {
-		return nil, err
-	}
-
-	colMap := make(map[string]*Field)
-
-	for _, col := range columns {
-		colMap[col] = s.table.GetField(col)
-	}
-
-	ret := []map[string]interface{}{}
-	for rows.Next() {
-		values := make([]interface{}, len(columns))
-		for i := range values {
-			values[i] = new(interface{})
-		}
-		err = rows.Scan(values...)
-		if err != nil {
-			return nil, err
-		}
-		dest := make(map[string]interface{})
-		for i, column := range columns {
-			dest[column] = *(values[i].(*interface{}))
-
-			if field, ok := colMap[column]; ok {
-				dest[column] = ParseVal(field, dest[column])
-			}
-
-		}
-		ret = append(ret, dest)
-	}
-
-	if rows.Err() != nil {
-		return nil, rows.Err()
 	}
 
 	if s.table != nil {
@@ -425,6 +385,19 @@ func (s *Stmt) Map() ([]map[string]interface{}, error) {
 	return ret, nil
 }
 
+func (self *Table) insert(_updates map[string]interface{}) error {
+
+	query, err := self.InsertQuery(_updates)
+	if err != nil {
+		return err
+	}
+	if DEBUG {
+		log.Println(query)
+	}
+	_, err = self.Schema.Db.Exec(query)
+	return err
+}
+
 func (self *Table) Insert(_updates map[string]interface{}) error {
 
 	if self.Schema != nil && self.Schema.LifeCycle != nil {
@@ -445,7 +418,34 @@ func (self *Table) Insert(_updates map[string]interface{}) error {
 		}
 	}
 
-	query, err := self.InsertQuery(_updates)
+	if err := self.insert(_updates); err != nil {
+		return err
+	}
+
+	if self.Schema != nil && self.Schema.LifeCycle != nil {
+		for _, f := range self.Schema.LifeCycle.AfterCreates {
+			if err := f(_updates); err != nil {
+				return err
+			}
+
+		}
+	}
+
+	if self.LifeCycle != nil {
+		for _, f := range self.LifeCycle.AfterCreates {
+			if err := f(_updates); err != nil {
+				return err
+			}
+
+		}
+	}
+
+	return nil
+
+}
+
+func (self *Table) update(crit, updates map[string]interface{}) error {
+	query, err := self.UpdateQuery(crit, updates)
 	if err != nil {
 		return err
 	}
@@ -476,7 +476,33 @@ func (self *Table) Update(crit, updates map[string]interface{}) error {
 		}
 	}
 
-	query, err := self.UpdateQuery(crit, updates)
+	if err := self.update(crit, updates); err != nil {
+		return err
+	}
+
+	if self.Schema != nil && self.Schema.LifeCycle != nil {
+		for _, f := range self.Schema.LifeCycle.AfterUpdates {
+			if err := f(crit, updates); err != nil {
+				return err
+			}
+
+		}
+	}
+
+	if self.LifeCycle != nil {
+		for _, f := range self.LifeCycle.AfterUpdates {
+			if err := f(crit, updates); err != nil {
+				return err
+			}
+
+		}
+	}
+
+	return nil
+}
+
+func (self *Table) remove(crit map[string]interface{}) error {
+	query, err := self.RemoveQuery(crit)
 	if err != nil {
 		return err
 	}
@@ -506,13 +532,74 @@ func (self *Table) Remove(crit map[string]interface{}) error {
 
 		}
 	}
-	query, err := self.RemoveQuery(crit)
-	if err != nil {
+
+	if err := self.remove(crit); err != nil {
 		return err
 	}
-	if DEBUG {
-		log.Println(query)
+
+	if self.Schema != nil && self.Schema.LifeCycle != nil {
+		for _, f := range self.Schema.LifeCycle.AfterRemoves {
+			if err := f(crit); err != nil {
+				return err
+			}
+
+		}
 	}
-	_, err = self.Schema.Db.Exec(query)
-	return err
+
+	if self.LifeCycle != nil {
+		for _, f := range self.LifeCycle.AfterRemoves {
+			if err := f(crit); err != nil {
+				return err
+			}
+
+		}
+	}
+
+	return nil
+}
+
+func Map(db *sql.DB, query string, typeMap map[string]string) ([]map[string]interface{}, error) {
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+	columns, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+
+	ret := []map[string]interface{}{}
+	for rows.Next() {
+		values := make([]interface{}, len(columns))
+		for i := range values {
+			values[i] = new(interface{})
+		}
+		err = rows.Scan(values...)
+		if err != nil {
+			return nil, err
+		}
+		dest := make(map[string]interface{})
+		for i, column := range columns {
+			dest[column] = *(values[i].(*interface{}))
+
+			if typeMap == nil { // use string for default
+				dest[column] = ParseVal("string", dest[column])
+				continue
+			}
+
+			if _type, ok := typeMap[column]; ok {
+				dest[column] = ParseVal(_type, dest[column])
+			}
+
+		}
+		ret = append(ret, dest)
+	}
+
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+
+	return ret, nil
 }
