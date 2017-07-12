@@ -470,7 +470,7 @@ func ParseMetaQuery(crit map[string]interface{}) (*MetaQuery, error) {
 func (t *Table) find(others ...map[string]interface{}) (selectedFields []string, nonSelectClause string, orderby []string, limit int, offset int, err error) {
 	for _, field := range t.Fields {
 		if field.Selected {
-			selectedFields = append(selectedFields, field.Name)
+			selectedFields = append(selectedFields, field.FullName())
 		}
 	}
 
@@ -550,10 +550,15 @@ func (t *Table) find(others ...map[string]interface{}) (selectedFields []string,
 			fieldName := _sp[0]
 
 			field := t.GetField(fieldName)
+
 			if field == nil {
 				err = fmt.Errorf(`no field name [%s] found from table [%s]`, fieldName, t.TableName)
 				return
 			}
+			if !field.Selected {
+				continue // using for hidding certain fields. e.g. user->password field
+			}
+
 			//check foreignkey associations
 			if field.ReferencedTable == nil {
 				err = fmt.Errorf(`no foreign table   installed for col [%s] from table [%s]`, fieldName, t.TableName)
@@ -593,6 +598,11 @@ func (t *Table) find(others ...map[string]interface{}) (selectedFields []string,
 			if len(foreignFields) == 0 {
 				//use all foreign table fields
 				for _, field := range field.ReferencedTable.Fields {
+
+					if field.Hide == true {
+						continue
+					}
+
 					foreignFields = append(foreignFields, field.FullNameAS(fieldName, tableAlias))
 				}
 			}

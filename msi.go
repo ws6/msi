@@ -116,6 +116,8 @@ func NewDb(driver, dsnString, schema, tableNames string) (*Msi, error) {
 				Extra:           col.Extra,
 				Comment:         col.Comment,
 			}
+			field.Selected = true //!!! be aware default is selected unless unselected after loading
+
 			table.Fields = append(table.Fields, field)
 		}
 		ret.Tables = append(ret.Tables, table)

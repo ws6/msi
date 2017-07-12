@@ -14,6 +14,7 @@ type Field struct {
 	IsNumber bool
 	Length   int
 	Selected bool
+	Hide     bool //not same as selected. selected but hide
 
 	ReferencedTable *Table
 	ReferencedField *Field
