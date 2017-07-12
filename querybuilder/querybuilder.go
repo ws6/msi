@@ -49,13 +49,14 @@ var (
 )
 
 type QueryParams struct {
-	Limit    int
-	Skip     int
-	Fields   map[string]int `json:"-"`
-	Or       bool
-	Critiera map[string]interface{}
-	SortBy   []string
-	GroupBy  []string
+	Limit     int
+	Skip      int
+	Fields    map[string]int `json:"-"`
+	Or        bool
+	Critiera  map[string]interface{}
+	SortBy    []string
+	GroupBy   []string
+	Populates []string //simple form for left join
 }
 
 func IsAtomicKinds(k reflect.Kind) bool {
@@ -386,16 +387,16 @@ func Build(c CanGet, fieldMap map[string]string) (*QueryParams, error) {
 	}
 	if sortBy := c.Get(`_sortby`); sortBy != "" {
 		ret.SortBy = strings.Split(sortBy, ",")
-		if err != nil {
-			return nil, fmt.Errorf(`parse sortby error ` + err.Error())
-		}
+
 	}
 
 	if groupCountBy := c.Get(`_groupby`); groupCountBy != "" {
 		ret.GroupBy = strings.Split(groupCountBy, ",")
-		if err != nil {
-			return nil, fmt.Errorf(`parse groupcountby error ` + err.Error())
-		}
+
+	}
+
+	if groupCountBy := c.Get(`_populates`); groupCountBy != "" {
+		ret.Populates = strings.Split(groupCountBy, "|")
 	}
 
 	if fields := c.Get(`_fields`); fields != "" {

@@ -57,7 +57,8 @@ func IsMetaQuery(op string) bool {
 		return true
 	case JOINS:
 		return true
-
+	case POPULATES:
+		return true
 	}
 	return false
 }
@@ -412,10 +413,9 @@ func InterfaceToStringArray(v interface{}) []string {
 }
 
 func (t *Table) ParseMetaQuery(crit map[string]interface{}) (*MetaQuery, error) {
-	if DEBUG {
-		log.Printf("other[1] %+v", crit)
-	}
+
 	if crit != nil {
+
 		return ParseMetaQuery(crit)
 	}
 
@@ -555,15 +555,21 @@ func (t *Table) find(others ...map[string]interface{}) (selectedFields []string,
 				return
 			}
 			//check foreignkey associations
-			if field.ReferencedTable == nil || field.ReferencedField == nil {
-				err = fmt.Errorf(`no foreign table or  foreign field installed for col [%s]`, fieldName)
+			if field.ReferencedTable == nil {
+				err = fmt.Errorf(`no foreign table   installed for col [%s] from table [%s]`, fieldName, t.TableName)
 				return
 			}
 
+			if field.ReferencedField == nil {
+				err = fmt.Errorf(`no foreign column   installed for col [%s] from table[%s]`, fieldName, t.TableName)
+				return
+			}
+			tableAlias := fmt.Sprintf("%s__%s", field.ReferencedTable.TableName, field.Name)
 			leftjoins = append(leftjoins,
-				fmt.Sprintf(` left join %s on %s.%s = %s.%s `,
+				fmt.Sprintf(` left join %s  %s on %s.%s = %s.%s `,
 					field.ReferencedTable.TableName,
-					field.ReferencedTable.TableName,
+					tableAlias,
+					tableAlias,
 					field.ReferencedField.Name,
 					t.TableName, fieldName,
 				),
@@ -580,17 +586,19 @@ func (t *Table) find(others ...map[string]interface{}) (selectedFields []string,
 						err = fmt.Errorf(`no foreign field found [%s]`, _col)
 						return
 					}
-					foreignFields = append(foreignFields, foreignField.FullName())
+					foreignFields = append(foreignFields, foreignField.FullNameAS(fieldName, tableAlias))
 				}
 			}
 
 			if len(foreignFields) == 0 {
 				//use all foreign table fields
 				for _, field := range field.ReferencedTable.Fields {
-					foreignFields = append(foreignFields, field.FullName())
+					foreignFields = append(foreignFields, field.FullNameAS(fieldName, tableAlias))
 				}
 			}
-
+			if len(selectedFields) == 0 {
+				selectedFields = append(selectedFields, fmt.Sprintf("%s.*", t.TableName))
+			}
 			for _, k := range foreignFields {
 				selectedFields = append(selectedFields, k)
 			}

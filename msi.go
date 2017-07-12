@@ -3,6 +3,7 @@ package msi
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/mijia/modelq/drivers" //thank you mijia
@@ -44,12 +45,13 @@ type LifeCycle struct {
 }
 
 type Msi struct {
-	Tables       []*Table
-	*LifeCycle   //global lifecycle; note there is a table level lifecycle as well
-	Db           *sql.DB
-	DriverName   string
-	DsnString    string //mysql or postgre
-	DatabaseName string //database name or schema in postgres
+	Tables            []*Table
+	*LifeCycle        //global lifecycle; note there is a table level lifecycle as well
+	Db                *sql.DB
+	DriverName        string
+	DsnString         string //mysql or postgre
+	DatabaseName      string //database name or schema in postgres
+	ForeignKeyTypeMap map[string]string
 }
 
 func (self *Msi) GetTable(tableName string) *Table {
@@ -187,7 +189,7 @@ func getFieldFromInterface(table *Table, _col interface{}) (*Field, error) {
 
 func LoadMySqlForeignKeys(db *Msi) error {
 
-	res, err := Map(db.Db, mysqlForeignkeyQuery(db.DatabaseName), foreignKeyMap)
+	res, err := db.Map(db.Db, mysqlForeignkeyQuery(db.DatabaseName), foreignKeyMap)
 	if err != nil {
 		return err
 	}
@@ -213,6 +215,13 @@ func LoadMySqlForeignKeys(db *Msi) error {
 		}
 		currentCol.ReferencedTable = refTable
 		currentCol.ReferencedField = foreignCol
+
+		if DEBUG {
+			log.Printf(`installed foreign key for %s.%s refers to->%s.%s `,
+				table.TableName, currentCol.Name,
+				refTable.TableName, foreignCol.Name,
+			)
+		}
 
 	}
 	return nil

@@ -55,10 +55,11 @@ func MakeFindFunc(c *BlueprintsController, others ...map[string]interface{}) fun
 			others = append(others, crit)
 			fmt.Printf("%+v", crit)
 			metaQuery := map[string]interface{}{
-				msi.LIMIT:   qb.Limit,
-				msi.OFFSET:  qb.Skip,
-				msi.ORDERBY: qb.SortBy,
-				msi.GROUPBY: qb.GroupBy,
+				msi.LIMIT:     qb.Limit,
+				msi.OFFSET:    qb.Skip,
+				msi.ORDERBY:   qb.SortBy,
+				msi.GROUPBY:   qb.GroupBy,
+				msi.POPULATES: qb.Populates,
 				//msi.FIELDS:  qb.Fields,
 			}
 

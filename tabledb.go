@@ -344,7 +344,9 @@ func ParseVal(_type string, v interface{}) interface{} {
 //Map https://github.com/jmoiron/sqlx/blob/master/sqlx.go#L820
 
 func (s *Stmt) Map() ([]map[string]interface{}, error) {
-
+	if s.table == nil || s.table.Schema == nil {
+		return nil, fmt.Errorf(`no table or db installed`)
+	}
 	if s.err != nil {
 		return nil, s.err
 	}
@@ -356,7 +358,7 @@ func (s *Stmt) Map() ([]map[string]interface{}, error) {
 	if DEBUG {
 		log.Println(query)
 	}
-	ret, err := Map(s.Db, query, typemap)
+	ret, err := s.table.Schema.Map(s.Db, query, typemap)
 
 	if err != nil {
 		return nil, err
@@ -558,7 +560,34 @@ func (self *Table) Remove(crit map[string]interface{}) error {
 	return nil
 }
 
-func Map(db *sql.DB, query string, typeMap map[string]string) ([]map[string]interface{}, error) {
+func (self *Msi) installForeignKeyMap() {
+	if self.ForeignKeyTypeMap == nil {
+		self.ForeignKeyTypeMap = make(map[string]string)
+	}
+
+	for _, table := range self.Tables {
+		for _, field := range table.Fields {
+
+			if field.ReferencedTable == nil { //!!! only install for foreign keys
+				continue
+			}
+
+			for _, fkField := range field.ReferencedTable.Fields {
+				k := fmt.Sprintf("%s__%s", field.Name, fkField.Name)
+				self.ForeignKeyTypeMap[k] = fkField.Type
+			}
+
+		}
+	}
+}
+
+func (self *Msi) Map(db *sql.DB, query string, typeMap map[string]string) ([]map[string]interface{}, error) {
+	if self.ForeignKeyTypeMap == nil {
+		self.ForeignKeyTypeMap = make(map[string]string)
+	}
+	if len(self.ForeignKeyTypeMap) == 0 && len(self.Tables) > 0 {
+		self.installForeignKeyMap()
+	}
 	rows, err := db.Query(query)
 	if err != nil {
 		return nil, err
@@ -583,15 +612,18 @@ func Map(db *sql.DB, query string, typeMap map[string]string) ([]map[string]inte
 		dest := make(map[string]interface{})
 		for i, column := range columns {
 			dest[column] = *(values[i].(*interface{}))
+			_type := `string`
 
-			if typeMap == nil { // use string for default
-				dest[column] = ParseVal("string", dest[column])
-				continue
+			if __type, ok := typeMap[column]; ok {
+				_type = __type
 			}
 
-			if _type, ok := typeMap[column]; ok {
-				dest[column] = ParseVal(_type, dest[column])
+			if __type, ok := self.ForeignKeyTypeMap[column]; ok {
+				_type = __type
+
 			}
+
+			dest[column] = ParseVal(_type, dest[column])
 
 		}
 		ret = append(ret, dest)

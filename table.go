@@ -38,6 +38,14 @@ func (self *Field) FullName() string {
 	return fmt.Sprintf("%s.%s", self.table.TableName, self.Name)
 }
 
+func (self *Field) FullNameAS(k, tableAlias string) string { // useing double underscores for uniqueness
+	if self.table == nil {
+		return self.Name
+	}
+
+	return fmt.Sprintf("%s.%s AS %s__%s", tableAlias, self.Name, k, self.Name)
+}
+
 type Table struct {
 	TableName  string
 	*LifeCycle //lifecycle events
