@@ -9,6 +9,14 @@ import (
 	"time"
 )
 
+var (
+	NOT_FOUND = fmt.Errorf(`not found`)
+)
+
+func IsNotFoundErr(err error) bool {
+	return err == NOT_FOUND
+}
+
 type Stmt struct {
 	query  string
 	Db     *sql.DB
@@ -634,4 +642,16 @@ func (self *Msi) Map(db *sql.DB, query string, typeMap map[string]string) ([]map
 	}
 
 	return ret, nil
+}
+
+func (t *Table) FindOne(crit ...map[string]interface{}) (M, error) {
+
+	founds, err := t.Find(crit...).Map()
+	if err != nil {
+		return nil, err
+	}
+	if len(founds) == 0 {
+		return nil, NOT_FOUND
+	}
+	return founds[0], nil
 }

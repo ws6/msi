@@ -2,6 +2,7 @@ package msi
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"time"
 )
@@ -34,9 +35,21 @@ func InterfaceToString(i interface{}) string {
 	if s, ok := i.(float64); ok {
 		return fmt.Sprintf(`%f`, s)
 	}
-
+	sqlTimeFormatter := "'%04d-%02d-%02d %02d:%02d:%02d'"
 	if s, ok := i.(time.Time); ok {
-		return fmt.Sprintf("'%4d-%2d-%2d %2d:%2d:%2d'", s.Year(), s.Month(), s.Day(), s.Hour(), s.Minute(), s.Second()) //TODO to be better formatted
+		return fmt.Sprintf(sqlTimeFormatter, s.Year(), s.Month(), s.Day(), s.Hour(), s.Minute(), s.Second()) //TODO to be better formatted
+	}
+
+	if tPtr, ok := i.(*time.Time); ok {
+		s := *tPtr
+		if tPtr != nil {
+			return fmt.Sprintf(sqlTimeFormatter, s.Year(), s.Month(), s.Day(), s.Hour(), s.Minute(), s.Second()) //TODO to be better formatted
+		}
+
+	}
+
+	if DEBUG {
+		log.Println(`can not figure out type of interface `, i)
 	}
 	return ""
 }
