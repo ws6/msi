@@ -10,14 +10,14 @@ import (
 func ToString(i interface{}) (string, error) {
 	ret, ok := i.(string)
 	if !ok {
-		return "", fmt.Errorf(`not a string`)
+		return "", fmt.Errorf(`not a string, [%v]`, i)
 	}
 	return ret, nil
 }
 func ToInt(i interface{}) (int, error) {
 	ret, ok := i.(int)
 	if !ok {
-		return 0, fmt.Errorf(`not a int`)
+		return 0, fmt.Errorf(`not a int [%v]`, i)
 	}
 	return ret, nil
 }
@@ -25,7 +25,7 @@ func ToInt(i interface{}) (int, error) {
 func ToFloat(i interface{}) (float64, error) {
 	ret, ok := i.(float64)
 	if !ok {
-		return float64(0), fmt.Errorf(`not a float64`)
+		return float64(0), fmt.Errorf(`not a float64 [%v]`, i)
 	}
 	return ret, nil
 }
@@ -38,7 +38,7 @@ func ToTime(i interface{}) (*time.Time, error) {
 		return ret, nil
 	}
 
-	return nil, fmt.Errorf(`not a time.Time or *time.Time`)
+	return nil, fmt.Errorf(`not a time.Time or *time.Time or nil`)
 }
 
 func GetKeyStr(m map[string]interface{}, key string) (string, error) {
@@ -54,7 +54,11 @@ func GetKeyInt(m map[string]interface{}, key string) (int, error) {
 	if !ok {
 		return 0, fmt.Errorf(`not found key [%s]`, key)
 	}
-	return ToInt(_s)
+	n, err := ToInt(_s)
+	if err != nil {
+		return 0, fmt.Errorf(`key[%s] to int err: %s `, key, err.Error())
+	}
+	return n, nil
 }
 
 func GetKeyFloat64(m map[string]interface{}, key string) (float64, error) {
@@ -65,7 +69,7 @@ func GetKeyFloat64(m map[string]interface{}, key string) (float64, error) {
 	return ToFloat(_s)
 }
 
-func GetTime(m map[string]interface{}, key string) (*time.Time, error) {
+func GetKeyTime(m map[string]interface{}, key string) (*time.Time, error) {
 	_s, ok := m[key]
 	if !ok {
 		return nil, fmt.Errorf(`not found key [%s]`, key)

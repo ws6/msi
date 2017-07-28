@@ -374,6 +374,7 @@ func (t *Table) SafeWhere(crit map[string]interface{}) (string, error) {
 
 	for _, where := range _wheres {
 		//Align fieldname
+		where.FieldName = fmt.Sprintf(`%s.%s`, t.TableName, where.FieldName)
 		for _, field := range t.Fields {
 			//loosing the checker by allow tablename.fieldname format
 			if field.Name == where.FieldName || fmt.Sprintf(`%s.%s`, t.TableName, field.Name) == where.FieldName {

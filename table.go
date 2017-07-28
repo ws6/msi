@@ -135,7 +135,7 @@ func (t *Table) MakeInsertFields(updates []*NameVal) []string {
 			continue
 		}
 
-		ret = append(ret, k)
+		ret = append(ret, fmt.Sprintf("%s.%s", t.TableName, k))
 	}
 
 	return ret
