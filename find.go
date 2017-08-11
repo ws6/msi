@@ -371,14 +371,31 @@ func (t *Table) SafeWhere(crit map[string]interface{}) (string, error) {
 	}
 
 	wheres := []*Where{}
-
+	tableTypeMap := t.GetForeignTableMap()
+	allowedForeignKeyField := func(wf string) bool {
+		if _, ok := tableTypeMap[wf]; ok {
+			return true
+		}
+		return false
+	}
 	for _, where := range _wheres {
-		//Align fieldname
+		//!!!exception for special format foreign keys; and dont re-write it
+		if allowedForeignKeyField(where.FieldName) {
+			if DEBUG {
+				log.Println(`fk is allowed`, where.FieldName)
+			}
+			wheres = append(wheres, where)
+			continue
+		}
 		where.FieldName = fmt.Sprintf(`%s.%s`, t.TableName, where.FieldName)
 		for _, field := range t.Fields {
 			//loosing the checker by allow tablename.fieldname format
 			if field.Name == where.FieldName || fmt.Sprintf(`%s.%s`, t.TableName, field.Name) == where.FieldName {
 				wheres = append(wheres, where)
+				continue
+			}
+			if DEBUG {
+				log.Println(`where fieldname get filtered`, where.FieldName)
 			}
 		}
 	}
@@ -467,6 +484,10 @@ func ParseMetaQuery(crit map[string]interface{}) (*MetaQuery, error) {
 	}
 	return ret, nil
 }
+
+//func getTableAlias(referencedTableName, thisFieldName string) string {
+//	return fmt.Sprintf("%s__%s", referencedTableName, thisFieldName)
+//}
 
 func (t *Table) find(others ...map[string]interface{}) (selectedFields []string, nonSelectClause string, orderby []string, limit int, offset int, err error) {
 	for _, field := range t.Fields {
@@ -570,7 +591,8 @@ func (t *Table) find(others ...map[string]interface{}) (selectedFields []string,
 				err = fmt.Errorf(`no foreign column   installed for col [%s] from table[%s]`, fieldName, t.TableName)
 				return
 			}
-			tableAlias := fmt.Sprintf("%s__%s", field.ReferencedTable.TableName, field.Name)
+			//			tableAlias := fmt.Sprintf("%s__%s", field.ReferencedTable.TableName, field.Name)
+			tableAlias := field.GetTableAlias()
 			leftjoins = append(leftjoins,
 				fmt.Sprintf(` left join %s  %s on %s.%s = %s.%s `,
 					field.ReferencedTable.TableName,

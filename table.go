@@ -39,6 +39,10 @@ func (self *Field) FullName() string {
 	return fmt.Sprintf("%s.%s", self.table.TableName, self.Name)
 }
 
+func (self *Field) GetTableAlias() string {
+	return fmt.Sprintf("%s__%s", self.ReferencedTable.TableName, self.Name)
+}
+
 func (self *Field) FullNameAS(k, tableAlias string) string { // useing double underscores for uniqueness
 	if self.table == nil {
 		return self.Name
@@ -168,12 +172,39 @@ func (t *Table) MakeInsertValues(updates []*NameVal) []string {
 
 	return ret
 }
+func (t *Table) GetTypeMap() map[string]string {
+	prim := t.GetPrimTypeMap()
 
-func (t *Table) GetTypeMap() map[string]string { //filename->type
+	fkMap := t.GetForeignTableMap()
+
+	for k, v := range fkMap {
+		prim[k] = v
+	}
+
+	return prim
+}
+
+func (t *Table) GetPrimTypeMap() map[string]string { //filename->type
 	ret := make(map[string]string)
 	for _, f := range t.Fields {
 		ret[f.Name] = f.Type
 	}
 
+	return ret
+}
+
+//usergroup__group_id.status
+
+func (t *Table) GetForeignTableMap() map[string]string {
+	ret := make(map[string]string)
+	for _, f := range t.Fields {
+		if f.ReferencedField == nil || f.ReferencedTable == nil {
+			continue
+		}
+		for _, rf := range f.ReferencedTable.Fields {
+			k := fmt.Sprintf("%s.%s", f.GetTableAlias(), rf.Name)
+			ret[k] = rf.Type
+		}
+	}
 	return ret
 }
