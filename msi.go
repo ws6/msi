@@ -51,6 +51,7 @@ type Msi struct {
 	DriverName        string
 	DsnString         string //mysql or postgre
 	DatabaseName      string //database name or schema in postgres
+	tableNames        string
 	ForeignKeyTypeMap map[string]string
 }
 
@@ -72,20 +73,35 @@ func (self *Msi) Close() error {
 	return nil
 }
 
+func (self *Msi) Open() error {
+	if self.Db != nil {
+		newDb, err := sql.Open(self.DriverName, self.DsnString) //provide a Close interface
+		if err != nil {
+			return err
+		}
+		self.Db = newDb
+	}
+
+	return nil
+}
+
 //NewDb loading all tables field definitions from database
 //NewDb(`mysql`, `rw_sage:Exxxc0ndid0@(ussd-prd-mysq01:3306)/sage`, `sage`,``)
 func NewDb(driver, dsnString, schema, tableNames string) (*Msi, error) {
 	ret := new(Msi)
-	ret.DriverName = driver
 	ret.LifeCycle = new(LifeCycle)
+	ret.DriverName = driver
+	ret.DsnString = dsnString
+
+	ret.tableNames = tableNames
 	ret.DatabaseName = schema
-	dbSchema, err := drivers.LoadDatabaseSchema(driver, dsnString, schema, tableNames)
+	dbSchema, err := drivers.LoadDatabaseSchema(ret.DriverName, ret.DsnString, ret.DatabaseName, ret.tableNames)
 
 	if err != nil {
 		return nil, err
 	}
 
-	ret.Db, err = sql.Open(driver, dsnString)
+	ret.Db, err = sql.Open(ret.DriverName, ret.DsnString)
 
 	if err != nil {
 		return nil, err
