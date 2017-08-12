@@ -143,7 +143,7 @@ func (s *Stmt) Chan(limit int) chan map[string]interface{} {
 
 			if err != nil {
 				if DEBUG {
-					log.Panicln(err.Error())
+					log.Println(err.Error())
 				}
 				break
 			}

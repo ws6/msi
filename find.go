@@ -395,7 +395,7 @@ func (t *Table) SafeWhere(crit map[string]interface{}) (string, error) {
 				continue
 			}
 			if DEBUG {
-				log.Println(`where fieldname get filtered`, where.FieldName)
+				log.Println(`where fieldname get filtered `, where.FieldName, t.TableName)
 			}
 		}
 	}
