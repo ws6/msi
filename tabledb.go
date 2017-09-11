@@ -28,9 +28,10 @@ type Stmt struct {
 
 //Page one page of results with Total count information
 type Page struct {
-	Total    int
-	Limit    int
-	Offset   int
+	Total  int
+	Limit  int
+	Offset int
+
 	FindErr  error
 	CountErr error
 	Data     []map[string]interface{}

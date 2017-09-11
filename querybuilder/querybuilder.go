@@ -298,9 +298,10 @@ func BuildAllParams(params map[string]string, fieldMap map[string]string) (map[s
 	var OrList []interface{}
 	for k, v := range params {
 		t := FieldType(k, fieldMap)
-		if _, ok := fieldMap[strings.ToLower(k)]; !ok {
-			return nil, fmt.Errorf("key %s is not in any of the struct flat fields", k)
-		}
+		//		if _, ok := fieldMap[strings.ToLower(k)]; !ok {
+		//			fmt.Println(fieldMap)
+		//			return nil, fmt.Errorf("key [%s] is not in any of the struct flat fields", k)
+		//		}
 
 		andMap := make(map[string]interface{})
 		orMap := make(map[string]interface{})

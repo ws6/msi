@@ -73,7 +73,7 @@ func (self *Msi) Close() error {
 	return nil
 }
 
-func (self *Msi) Open() error {
+func (self *Msi) ReOpen() error {
 	if self.Db != nil {
 		newDb, err := sql.Open(self.DriverName, self.DsnString) //provide a Close interface
 		if err != nil {
