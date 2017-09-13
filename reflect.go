@@ -3,7 +3,9 @@ package msi
 import "reflect"
 
 func IsArray(v interface{}) bool {
-
+	if v == nil {
+		return false
+	}
 	rt := reflect.TypeOf(v)
 	switch rt.Kind() {
 	case reflect.Slice:

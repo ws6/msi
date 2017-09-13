@@ -81,18 +81,20 @@ func TestBuildOneParam(t *testing.T) {
 
 func TestBuild(t *testing.T) {
 	params := map[string]string{
-		`country`:     `China`,
-		`okay`:        `$exists:true`,
-		`name`:        `$regex:LP60001.*`,
-		`createdat`:   `or:$lte:2012-11-26`,
-		`ProjectName`: `$nin:abc,def,gha_123`,
+		`country`:      `China`,
+		`okay`:         `$exists:true`,
+		`name`:         `$regex:LP60001.*`,
+		`createdat`:    `or:$lte:2012-11-26`,
+		`ProjectName`:  `$nin:abc,def,gha_123`,
+		`ProjectName2`: `$in:abc,def,gha_123`,
 	}
 	fm := map[string]string{
-		`okay`:        `string`,
-		`name`:        `string`,
-		`country`:     `string`,
-		`createdat`:   `Time`,
-		`projectname`: `string`,
+		`okay`:         `string`,
+		`name`:         `string`,
+		`country`:      `string`,
+		`createdat`:    `Time`,
+		`projectname`:  `string`,
+		`projectname2`: `string`,
 	}
 	m, err := BuildAllParams(params, fm)
 	if err != nil {
@@ -126,7 +128,7 @@ func (self *UrlParser) Get(name string) string {
 
 func TestBuildURL(t *testing.T) {
 	urls := []string{
-		`http://localhost/?field1=abc&_limit=7&_sortby=field1&_skip=5&_groupby=field1&_fields=field1,field2`,
+		`http://localhost/?field1=$in:abc&_limit=7&_sortby=field1&_skip=5&_groupby=field1&_fields=field1,field2`,
 	}
 	filemap := map[string]string{
 		`field1`: `string`,

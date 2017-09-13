@@ -101,6 +101,7 @@ func NeedArrayVals(op string) bool {
 //kType is only int, float, string or Time
 
 func BuildOne(kType string, text string, needOr bool, m map[string]interface{}) error {
+
 	//e.g field = $in:va1,val2,val3
 	opVal := strings.SplitN(text, ":", 3)
 
@@ -182,7 +183,8 @@ func BuildOne(kType string, text string, needOr bool, m map[string]interface{}) 
 		var _v interface{}
 		_v = v
 		switch kType {
-
+		case `string`:
+			_v = v
 		case `int`:
 			_v, _ = strconv.Atoi(v)
 		case `int64`:
@@ -204,8 +206,9 @@ func BuildOne(kType string, text string, needOr bool, m map[string]interface{}) 
 }
 
 func BuildOneOperator(kType string, text string, m map[string]interface{}) error {
-	//e.g field = $in:va1,val2,val3
+
 	opVal := strings.SplitN(text, ":", 3)
+
 	if len(opVal) == 0 {
 		return fmt.Errorf("missing op or value from %s", text)
 	}
@@ -224,6 +227,11 @@ func BuildOneOperator(kType string, text string, m map[string]interface{}) error
 		vals = opVal[1]
 	}
 	vals = strings.Trim(vals, " ")
+
+	if op == `$in` {
+		fmt.Println(`>>>>>>>>>>>>>>>>>>>>>>>found $in`, op, vals)
+	}
+
 	if vals == "" {
 		return fmt.Errorf(`no value found ` + text)
 	}
@@ -252,8 +260,12 @@ func BuildOneOperator(kType string, text string, m map[string]interface{}) error
 
 		return nil
 	}
+
 	//build a list of arrays
 	m[op] = strings.Split(vals, ",")
+	if NeedArrayVals(op) {
+		fmt.Println(`####################found array###############`, m[op])
+	}
 	//TODO type casting
 	return nil
 }

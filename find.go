@@ -3,6 +3,7 @@ package msi
 import (
 	"fmt"
 	"log"
+	//	"reflect"
 	"strings"
 	"time"
 )
@@ -188,7 +189,37 @@ func (self *WhereErr) Error() string {
 	return self.Message
 }
 
+func itos(i interface{}) string {
+	if i == nil {
+		return ``
+	}
+	switch v := i.(type) {
+	case int:
+		return fmt.Sprintf("%d", v)
+	case int64:
+		return fmt.Sprintf("%d", v)
+	case float64:
+		return fmt.Sprintf("%f", v)
+	case float32:
+		return fmt.Sprintf("%f", v)
+	case string:
+		return fmt.Sprintf("'%s'", v)
+	case bool:
+		if v {
+			return `true`
+		}
+		return `false`
+	case time.Time:
+		return v.String()
+	case *time.Time:
+		return v.String()
+	}
+
+	return ""
+}
+
 func ToArray(i interface{}) []string {
+
 	ret := []string{}
 
 	if ints, ok := i.([]int); ok {
@@ -235,6 +266,20 @@ func ToArray(i interface{}) []string {
 		}
 		return ret
 	}
+	if ints, ok := i.([]*time.Time); ok {
+		for _, v := range ints {
+
+			ret = append(ret, v.String())
+		}
+		return ret
+	}
+
+	if s, ok := i.([]interface{}); ok {
+		for _, _i := range s {
+			ret = append(ret, itos(_i))
+		}
+		return ret
+	}
 
 	return ret
 }
@@ -242,6 +287,7 @@ func ToArray(i interface{}) []string {
 func (w *Where) Values() []string {
 
 	if needMultipleValues(w.Operator) {
+
 		return ToArray(w.Value)
 	}
 
