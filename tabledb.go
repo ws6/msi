@@ -222,6 +222,15 @@ func GetTyped(destType string, i interface{}) interface{} {
 	return "unknown"
 }
 
+func (t *Table) GetMyField(colName string) *Field {
+	for _, f := range t.Fields {
+		if f.Name == colName {
+			return f
+		}
+	}
+	return nil
+}
+
 func (t *Table) GetField(colName string) *Field {
 
 	for _, f := range t.Fields {
@@ -464,6 +473,11 @@ func (self *Table) update(crit, updates map[string]interface{}) error {
 		log.Println(query)
 	}
 	_, err = self.Schema.Db.Exec(query)
+
+	if err != nil {
+		return fmt.Errorf(`update query err: %s  ;query %s`, query, err.Error())
+	}
+
 	return err
 }
 

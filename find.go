@@ -25,6 +25,7 @@ const (
 	GTE = `$gte`
 	LTE = `$lte`
 	EQ  = `$eq`
+	IS  = `$is`
 	NE  = `$ne`
 	//range operators
 	IN  = `$in`  //need values
@@ -84,6 +85,8 @@ func ToSQLOperator(op string) string {
 		return `<=`
 	case EQ:
 		return `=`
+	case IS:
+		return `is`
 	case NE:
 		return `!=`
 	case IN:
@@ -372,6 +375,13 @@ func ParseWhere(crit map[string]interface{}, ret *[]*Where, logicOp, compOp, fie
 		}
 
 		where := NewWhere(logicOp, compOp)
+
+		if v == nil {
+			if where.Operator == EQ {
+				where.Operator = IS // switching the IS operator
+			}
+		}
+
 		where.FieldName = k
 		if isOperator(k) {
 			where.Operator = k
