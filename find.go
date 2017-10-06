@@ -311,6 +311,12 @@ func (w *Where) GetValueString() string {
 
 func (w *Where) String() string {
 	//TODO print values
+	if w.Operator == EQ {
+
+		if w.GetValueString() == fmt.Sprintf("'%s'", EXISTS) {
+			return fmt.Sprintf(`%s %s %s`, ToSQLOperator(w.LogicOperator), w.FieldName, ToSQLOperator(EXISTS))
+		}
+	}
 
 	ret := fmt.Sprintf(`%s %s %s %s`,
 		ToSQLOperator(w.LogicOperator),
