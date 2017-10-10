@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -28,13 +29,96 @@ type Stmt struct {
 
 //Page one page of results with Total count information
 type Page struct {
-	Total  int
+	Total int
+
 	Limit  int
 	Offset int
 
 	FindErr  error
 	CountErr error
 	Data     []map[string]interface{}
+}
+
+////selectedFields, nonSelectClause, orderby, limit, offset, err := t.find(others...)
+//	if err != nil {
+//		return "", err
+//	}
+
+//GetGroupCountPage get total count, sum , and actual page
+func (self *Table) GetGroupCountPageCount(others ...map[string]interface{}) (int, error) {
+	selectedFields, nonSelectClause, _, _, _, err := self.find(others...)
+	if err != nil {
+		return 0, err
+	}
+	rawQuery := fmt.Sprintf(`SELECT %s %s`, strings.Join(selectedFields, ", "), nonSelectClause)
+
+	//re-wrap it into a new statement
+
+	//	https://stackoverflow.com/questions/14880080/mysql-sum-of-a-count-with-group-by-clause
+
+	countQuery := fmt.Sprintf(`SELECT count(*) as count FROM (%s) temp`, rawQuery)
+	if DEBUG {
+		fmt.Println(countQuery)
+	}
+	if self.Schema == nil {
+		return 0, fmt.Errorf(`no schema pointer found from table[%s]`, self.TableName)
+	}
+	rows, err := self.Schema.Db.Query(countQuery)
+
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	var total int
+	for rows.Next() {
+		err := rows.Scan(&total)
+		if err != nil {
+			return 0, err
+		}
+		return total, nil
+	}
+	return 0, nil
+}
+
+func (self *Table) GetGroupCountPage(others ...map[string]interface{}) (*Page, error) {
+	ret := new(Page)
+	ret.Limit = self.Limit
+	_, _, _, limit, offset, err := self.find(others...)
+	if err != nil {
+		return nil, err
+	}
+
+	if DEBUG {
+		log.Println(`limit->`, limit, `offset->`, offset)
+	}
+
+	if limit != 0 {
+		ret.Limit = limit
+	}
+	var wg sync.WaitGroup
+
+	wg.Add(2)
+
+	go func(_wg *sync.WaitGroup) {
+		ret.Offset = offset
+		ret.Data, ret.FindErr = self.Find(others...).Map(map[string]string{`count`: `int`})
+		_wg.Done()
+	}(&wg)
+
+	go func(_wg *sync.WaitGroup) {
+		ret.Total, ret.CountErr = self.GetGroupCountPageCount(others...)
+		_wg.Done()
+	}(&wg)
+	wg.Wait()
+
+	if ret.FindErr != nil {
+		return nil, fmt.Errorf(`find err: %s`, ret.FindErr.Error())
+	}
+	if ret.CountErr != nil {
+		return nil, fmt.Errorf(`count err: %s`, ret.CountErr.Error())
+	}
+	return ret, nil
 }
 
 func (self *Table) GetPage(others ...map[string]interface{}) (*Page, error) {
@@ -59,7 +143,7 @@ func (self *Table) GetPage(others ...map[string]interface{}) (*Page, error) {
 	var wg sync.WaitGroup
 
 	wg.Add(2)
-	//This is why we Go, isn't?
+	//This is why we Go, isn't it?
 	go func(_wg *sync.WaitGroup) {
 		ret.Data, ret.FindErr = self.Find(others...).Map()
 		_wg.Done()
@@ -361,7 +445,7 @@ func ParseVal(_type string, v interface{}) interface{} {
 
 //Map https://github.com/jmoiron/sqlx/blob/master/sqlx.go#L820
 
-func (s *Stmt) Map() ([]map[string]interface{}, error) {
+func (s *Stmt) Map(moreTypeMap ...map[string]string) ([]map[string]interface{}, error) {
 	if s.table == nil || s.table.Schema == nil {
 		return nil, fmt.Errorf(`no table or db installed`)
 	}
@@ -376,6 +460,15 @@ func (s *Stmt) Map() ([]map[string]interface{}, error) {
 	if DEBUG {
 		log.Println(query)
 	}
+
+	if len(moreTypeMap) > 0 {
+		for _, m := range moreTypeMap {
+			for _k, _v := range m {
+				typemap[_k] = _v
+			}
+		}
+	}
+
 	ret, err := s.table.Schema.Map(s.Db, query, typemap)
 
 	if err != nil {

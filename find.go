@@ -34,13 +34,15 @@ const (
 	EXISTS = `$exists` //if value is true then field is not null; else field is null
 	LIKE   = `$like`
 	//meta query constants
-	FIELDS    = `$fields`    // not part of SQL syntax; for overwritting the default field selection
-	JOINS     = `$joins`     // not part of SQL syntax
-	POPULATES = `$populates` // not part of SQL syntax; accept array of strings; if each field has foreign fields specified will use other wise, use all foreign fields  ["field1:foreign_field1,foreign_field2", "field2" ]
-	OFFSET    = `$offset`
-	LIMIT     = `$limit`
-	GROUPBY   = `$groupby`
-	ORDERBY   = `$orderby`
+	FIELDS       = `$fields`    // not part of SQL syntax; for overwritting the default field selection
+	JOINS        = `$joins`     // not part of SQL syntax
+	POPULATES    = `$populates` // not part of SQL syntax; accept array of strings; if each field has foreign fields specified will use other wise, use all foreign fields  ["field1:foreign_field1,foreign_field2", "field2" ]
+	OFFSET       = `$offset`
+	LIMIT        = `$limit`
+	GROUPBY      = `$groupby`
+	GROUPCOUNTBY = `$groupcountby`
+
+	ORDERBY = `$orderby`
 )
 
 func IsMetaQuery(op string) bool {
@@ -54,6 +56,8 @@ func IsMetaQuery(op string) bool {
 	case LIMIT:
 		return true
 	case GROUPBY:
+		return true
+	case GROUPCOUNTBY:
 		return true
 	case ORDERBY:
 		return true
@@ -456,9 +460,9 @@ func (t *Table) SafeWhere(crit map[string]interface{}) (string, error) {
 				wheres = append(wheres, where)
 				continue
 			}
-			if DEBUG {
-				log.Println(`where fieldname get filtered `, where.FieldName, t.TableName)
-			}
+			//			if DEBUG {
+			//				log.Println(`where fieldname get filtered `, where.FieldName, t.TableName)
+			//			}
 		}
 	}
 	whereClause := fmt.Sprintf(`WHERE TRUE  %s`, ToWhereString(wheres))
@@ -468,13 +472,14 @@ func (t *Table) SafeWhere(crit map[string]interface{}) (string, error) {
 }
 
 type MetaQuery struct {
-	Orderby   []string
-	Offset    int
-	Limit     int
-	GroupBy   []string
-	Fields    []string
-	Joins     []string
-	Populates []string
+	Orderby      []string
+	Offset       int
+	Limit        int
+	GroupBy      []string
+	GroupCountBy []string //special grouping will replace select fields
+	Fields       []string
+	Joins        []string
+	Populates    []string
 }
 
 func InterfaceToStringArray(v interface{}) []string {
@@ -523,14 +528,12 @@ func ParseMetaQuery(crit map[string]interface{}) (*MetaQuery, error) {
 			if ok {
 				ret.Limit = n
 			}
-			if DEBUG {
-				if !ok {
-					log.Panicln(`limit is not int`)
-				}
-			}
 
 		case GROUPBY:
 			ret.GroupBy = InterfaceToStringArray(v)
+		case GROUPCOUNTBY:
+			ret.GroupCountBy = InterfaceToStringArray(v)
+
 		case FIELDS:
 			ret.Fields = InterfaceToStringArray(v)
 		case ORDERBY:
@@ -709,6 +712,22 @@ func (t *Table) find(others ...map[string]interface{}) (selectedFields []string,
 	if len(mq.GroupBy) > 0 {
 		//TODO to add field checker?
 		nonSelectClause = fmt.Sprintf(`%s GROUP BY %s`, nonSelectClause, strings.Join(mq.GroupBy, " ,"))
+	}
+	//TODO install group countby then replace the select
+
+	if len(mq.GroupCountBy) > 0 {
+		if len(mq.GroupBy) > 0 {
+			err = fmt.Errorf(`can not mix group and group count`)
+			return
+		}
+
+		selectedFields = []string{} //clean out previous
+		for _, f := range mq.GroupCountBy {
+			selectedFields = append(selectedFields, f)
+		}
+		selectedFields = append(selectedFields, `count(*) as count`)
+		nonSelectClause = fmt.Sprintf(`%s GROUP BY %s`, nonSelectClause, strings.Join(mq.GroupCountBy, " ,"))
+
 	}
 
 	if len(mq.Orderby) > 0 {
