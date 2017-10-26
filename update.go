@@ -21,7 +21,10 @@ func (t *Table) SafeUpdate(updates map[string]interface{}) []string {
 		if !field.IsNumber {
 			_v = fmt.Sprintf("%s", _v)
 		}
-
+		found := t.GetMyField(k)
+		if found == nil {
+			continue //wash out the bad fields
+		}
 		up = append(up, fmt.Sprintf("%s.%s=%s", t.TableName, k, _v))
 	}
 	return up

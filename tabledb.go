@@ -66,7 +66,8 @@ func (self *Table) GetGroupCountPageCount(others ...map[string]interface{}) (int
 	rows, err := self.Schema.Db.Query(countQuery)
 
 	if err != nil {
-		return 0, err
+		fmt.Println(rawQuery)
+		return 0, fmt.Errorf(`countQuery err:%s`, err.Error())
 	}
 	defer rows.Close()
 
