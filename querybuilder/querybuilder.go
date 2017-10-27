@@ -41,6 +41,7 @@ var (
 		"$nin",
 		"$exists",
 		"$regex",
+		"$like",
 	}
 	ArrayValOps = []string{
 		"$in",

@@ -304,6 +304,7 @@ func (w *Where) Values() []string {
 
 func (w *Where) GetValueString() string {
 	values := w.Values()
+
 	if needMultipleValues(w.Operator) {
 		return fmt.Sprintf("(%s)", strings.Join(values, ", "))
 	}
@@ -320,6 +321,16 @@ func (w *Where) String() string {
 		if w.GetValueString() == fmt.Sprintf("'%s'", EXISTS) {
 			return fmt.Sprintf(`%s %s %s`, ToSQLOperator(w.LogicOperator), w.FieldName, ToSQLOperator(EXISTS))
 		}
+	}
+
+	if w.Operator == LIKE {
+		ret := fmt.Sprintf(`%s %s %s '%%%s%%'`,
+			ToSQLOperator(w.LogicOperator),
+			w.FieldName,
+			ToSQLOperator(w.Operator),
+			w.Value,
+		)
+		return ret
 	}
 
 	ret := fmt.Sprintf(`%s %s %s %s`,
