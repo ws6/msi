@@ -324,11 +324,16 @@ func (w *Where) String() string {
 	}
 
 	if w.Operator == LIKE {
-		ret := fmt.Sprintf(`%s %s %s '%%%s%%'`,
+		v := fmt.Sprintf(`%s`, w.Value)
+		//replacing special chars __ to %
+		v = strings.Replace(v, "__", "%", -1)
+
+		ret := fmt.Sprintf(`%s %s %s '%s'`,
 			ToSQLOperator(w.LogicOperator),
 			w.FieldName,
 			ToSQLOperator(w.Operator),
-			w.Value,
+			v,
+			//			w.Value,
 		)
 		return ret
 	}
