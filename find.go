@@ -14,7 +14,8 @@ import (
 //only try one level
 
 const (
-	UNLIMIT = -1
+	IS_NOT_NULL = `IS NOT NULL`
+	UNLIMIT     = -1
 	//logical operators
 	AND = `$and`
 	OR  = `$or`
@@ -98,7 +99,7 @@ func ToSQLOperator(op string) string {
 	case NIN:
 		return `NOT IN`
 	case EXISTS:
-		return `IS NOT NULL`
+		return IS_NOT_NULL
 	case LIKE:
 		return `LIKE`
 	}
@@ -336,6 +337,14 @@ func (w *Where) String() string {
 			//			w.Value,
 		)
 		return ret
+	}
+
+	if w.Operator == EXISTS {
+		return fmt.Sprintf(`%s %s %s`,
+			ToSQLOperator(w.LogicOperator),
+			w.FieldName,
+			ToSQLOperator(w.Operator),
+		)
 	}
 
 	ret := fmt.Sprintf(`%s %s %s %s`,

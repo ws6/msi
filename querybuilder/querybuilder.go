@@ -1,6 +1,7 @@
 package querybuilder
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -132,6 +133,14 @@ func BuildOne(kType string, text string, needOr bool, m map[string]interface{}) 
 		return nil //!!! skip done
 	}
 
+	if text == `$exists` {
+
+		m[text] = ""
+
+		fmt.Println(`found $exists`)
+		return nil
+	}
+
 	//validate op
 	if !IsOperatorAllowed(op) {
 		m[`$eq`] = text // treat it as a single equal operator
@@ -148,6 +157,7 @@ func BuildOne(kType string, text string, needOr bool, m map[string]interface{}) 
 		if vals == `true` {
 			m[op] = true
 		}
+		fmt.Println(`found $exists`)
 		return nil
 	}
 
@@ -207,71 +217,6 @@ func BuildOne(kType string, text string, needOr bool, m map[string]interface{}) 
 	return nil
 }
 
-func BuildOneOperator(kType string, text string, m map[string]interface{}) error {
-
-	opVal := strings.SplitN(text, ":", 3)
-
-	if len(opVal) == 0 {
-		return fmt.Errorf("missing op or value from %s", text)
-	}
-	op := opVal[0]
-	if len(opVal) == 1 {
-		op = `$eq`
-	}
-
-	//validate op
-	if !IsOperatorAllowed(op) {
-		return fmt.Errorf("%s is not allowed to use", op)
-	}
-
-	vals := opVal[0]
-	if len(opVal) > 1 {
-		vals = opVal[1]
-	}
-	vals = strings.Trim(vals, " ")
-
-	if op == `$in` {
-		fmt.Println(`>>>>>>>>>>>>>>>>>>>>>>>found $in`, op, vals)
-	}
-
-	if vals == "" {
-		return fmt.Errorf(`no value found ` + text)
-	}
-	if op == `$exists` {
-		m[op] = false
-		if vals == `true` {
-			m[op] = true
-		}
-		return nil
-	}
-
-	//insert {op:val}
-	if !NeedArrayVals(op) {
-		m[op] = vals
-		if len(vals) == 10 {
-			vals = fmt.Sprintf("%sT00:00:00-07:00", vals)
-		}
-
-		if kType == `Time` {
-			t, err := time.Parse(time.RFC3339, vals)
-			if err != nil {
-				return fmt.Errorf("  %s  ", err.Error())
-			}
-			m[op] = t
-		}
-
-		return nil
-	}
-
-	//build a list of arrays
-	m[op] = strings.Split(vals, ",")
-	if NeedArrayVals(op) {
-		fmt.Println(`####################found array###############`, m[op])
-	}
-	//TODO type casting
-	return nil
-}
-
 func BuildOneParam(kType string, text string, andMap map[string]interface{}, orMap map[string]interface{}) error {
 
 	//e.g field = $in:va1,val2,val3|$lt:val
@@ -312,10 +257,6 @@ func BuildAllParams(params map[string]string, fieldMap map[string]string) (map[s
 	var OrList []interface{}
 	for k, v := range params {
 		t := FieldType(k, fieldMap)
-		//		if _, ok := fieldMap[strings.ToLower(k)]; !ok {
-		//			fmt.Println(fieldMap)
-		//			return nil, fmt.Errorf("key [%s] is not in any of the struct flat fields", k)
-		//		}
 
 		andMap := make(map[string]interface{})
 		orMap := make(map[string]interface{})
@@ -439,7 +380,7 @@ func Build(c CanGet, fieldMap map[string]string) (*QueryParams, error) {
 			ret.Fields[k] = 1
 		}
 	}
-	//	b, _ := json.MarshalIndent(ret, "", "    ")
-	//	fmt.Println(string(b))
+	b, _ := json.MarshalIndent(ret, "", "    ")
+	fmt.Println(string(b))
 	return ret, nil
 }
