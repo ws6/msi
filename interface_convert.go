@@ -15,11 +15,14 @@ func ToString(i interface{}) (string, error) {
 	return ret, nil
 }
 func ToInt(i interface{}) (int, error) {
-	ret, ok := i.(int)
-	if !ok {
-		return 0, fmt.Errorf(`not a int [%v]`, i)
+	if ret, ok := i.(int); ok {
+		return ret, nil
 	}
-	return ret, nil
+
+	if ret, ok := i.(int64); ok {
+		return int(ret), nil
+	}
+	return 0, fmt.Errorf(`not a int or int64`)
 }
 
 func ToFloat(i interface{}) (float64, error) {
@@ -39,6 +42,16 @@ func ToTime(i interface{}) (*time.Time, error) {
 	}
 
 	return nil, fmt.Errorf(`not a time.Time or *time.Time or nil`)
+}
+
+//ToDate 2017-01-01 format
+func ToDateString(i interface{}) (string, error) {
+	d, err := ToTime(i)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%04d-%02d-%02d", d.Year(), d.Month(), d.Day()), nil
+
 }
 
 func GetKeyStr(m map[string]interface{}, key string) (string, error) {

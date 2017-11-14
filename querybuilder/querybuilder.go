@@ -1,7 +1,7 @@
 package querybuilder
 
 import (
-	"encoding/json"
+	//	"encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -137,7 +137,6 @@ func BuildOne(kType string, text string, needOr bool, m map[string]interface{}) 
 
 		m[text] = ""
 
-		fmt.Println(`found $exists`)
 		return nil
 	}
 
@@ -157,7 +156,7 @@ func BuildOne(kType string, text string, needOr bool, m map[string]interface{}) 
 		if vals == `true` {
 			m[op] = true
 		}
-		fmt.Println(`found $exists`)
+
 		return nil
 	}
 
@@ -224,7 +223,6 @@ func BuildOneParam(kType string, text string, andMap map[string]interface{}, orM
 
 	for _, op := range ops {
 
-		//		fmt.Println(op, ops)
 		if err := BuildOne(kType, op, false, andMap); err != nil {
 			return err
 		}
@@ -380,7 +378,7 @@ func Build(c CanGet, fieldMap map[string]string) (*QueryParams, error) {
 			ret.Fields[k] = 1
 		}
 	}
-	b, _ := json.MarshalIndent(ret, "", "    ")
-	fmt.Println(string(b))
+	//	b, _ := json.MarshalIndent(ret, "", "    ")
+	//	fmt.Println(string(b))
 	return ret, nil
 }
