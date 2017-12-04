@@ -70,6 +70,11 @@ func (t *Table) InsertQuery(_updates map[string]interface{}) (string, error) {
 
 	updates := []*NameVal{}
 	for k, v := range Stringify(_updates) {
+
+		if t.GetMyField(k) == nil {
+			continue //remove non-table defined fields
+		}
+
 		updates = append(updates, &NameVal{k, v})
 	}
 

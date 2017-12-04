@@ -3,10 +3,8 @@ package msi
 import (
 	"database/sql"
 	"fmt"
-	"log"
-	"strings"
 
-	"github.com/mijia/modelq/drivers" //thank you mijia
+	"strings"
 )
 
 var (
@@ -95,13 +93,18 @@ func NewDb(driver, dsnString, schema, tableNames string) (*Msi, error) {
 
 	ret.tableNames = tableNames
 	ret.DatabaseName = schema
-	dbSchema, err := drivers.LoadDatabaseSchema(ret.DriverName, ret.DsnString, ret.DatabaseName, ret.tableNames)
+	var err error
+	ret.Db, err = sql.Open(ret.DriverName, ret.DsnString)
 
 	if err != nil {
 		return nil, err
 	}
-
-	ret.Db, err = sql.Open(ret.DriverName, ret.DsnString)
+	loader, ok := Loaders[driver]
+	if !ok {
+		return nil, fmt.Errorf(`no loader defined for driver [%s]`, driver)
+	}
+	//	dbSchema, err := loader.LoadDatabaseSchema(ret.DsnString, ret.DatabaseName, ret.tableNames)
+	dbSchema, err := loader.LoadDatabaseSchema(ret)
 
 	if err != nil {
 		return nil, err
@@ -139,11 +142,8 @@ func NewDb(driver, dsnString, schema, tableNames string) (*Msi, error) {
 		ret.Tables = append(ret.Tables, table)
 
 	}
-
-	if ret.DriverName == `mysql` {
-		if err := LoadMySqlForeignKeys(ret); err != nil {
-			return nil, err
-		}
+	if err := loader.LoadForeignKeys(ret); err != nil {
+		return nil, err
 	}
 
 	return ret, nil
@@ -203,44 +203,4 @@ func getFieldFromInterface(table *Table, _col interface{}) (*Field, error) {
 
 	return field, nil
 
-}
-
-func LoadMySqlForeignKeys(db *Msi) error {
-
-	res, err := db.Map(db.Db, mysqlForeignkeyQuery(db.DatabaseName), foreignKeyMap)
-	if err != nil {
-		return err
-	}
-
-	for _, m := range res {
-		refTable, err := getTableFromInterface(db, m[`REFERENCED_TABLE_NAME`])
-		if err != nil {
-			return err
-		}
-		table, err := getTableFromInterface(db, m[`TABLE_NAME`])
-		if err != nil {
-			return err
-		}
-
-		foreignCol, err := getFieldFromInterface(refTable, m[`REFERENCED_COLUMN_NAME`])
-		if err != nil {
-			return err
-		}
-
-		currentCol, err := getFieldFromInterface(table, m[`COLUMN_NAME`])
-		if err != nil {
-			return err
-		}
-		currentCol.ReferencedTable = refTable
-		currentCol.ReferencedField = foreignCol
-
-		if DEBUG {
-			log.Printf(`installed foreign key for %s.%s refers to->%s.%s `,
-				table.TableName, currentCol.Name,
-				refTable.TableName, foreignCol.Name,
-			)
-		}
-
-	}
-	return nil
 }
