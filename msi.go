@@ -3,8 +3,6 @@ package msi
 import (
 	"database/sql"
 	"fmt"
-
-	"strings"
 )
 
 var (
@@ -43,6 +41,7 @@ type LifeCycle struct {
 }
 
 type Msi struct {
+	loader            ShemaLoader
 	Tables            []*Table
 	*LifeCycle        //global lifecycle; note there is a table level lifecycle as well
 	Db                *sql.DB
@@ -103,45 +102,12 @@ func NewDb(driver, dsnString, schema, tableNames string) (*Msi, error) {
 	if !ok {
 		return nil, fmt.Errorf(`no loader defined for driver [%s]`, driver)
 	}
+	ret.loader = loader
 	//	dbSchema, err := loader.LoadDatabaseSchema(ret.DsnString, ret.DatabaseName, ret.tableNames)
-	dbSchema, err := loader.LoadDatabaseSchema(ret)
-
-	if err != nil {
+	if err := loader.LoadDatabaseSchema(ret); err != nil {
 		return nil, err
 	}
 
-	for tbl, cols := range dbSchema {
-
-		table := new(Table)
-		table.LifeCycle = new(LifeCycle)
-		table.TableName = tbl
-
-		table.Schema = ret
-		table.Limit = DEFAULT_LIMIT
-		for _, col := range cols {
-			field := &Field{
-				table:    table,
-				Name:     col.ColumnName,
-				Type:     col.DataType,
-				IsNumber: IsNumber(col.DataType),
-				//TODO ParseLength
-				IsNullable:      strings.ToUpper(col.IsNullable) == "YES",
-				JsonMeta:        fmt.Sprintf("`json:\"%s\"`", col.ColumnName),
-				IsPrimaryKey:    strings.ToUpper(col.ColumnKey) == "PRI",
-				IsUniqueKey:     strings.ToUpper(col.ColumnKey) == "UNI",
-				IsIndexed:       strings.ToUpper(col.ColumnKey) == "MUL",
-				IsAutoIncrement: strings.ToUpper(col.Extra) == "AUTO_INCREMENT",
-				DefaultValue:    col.DefaultValue,
-				Extra:           col.Extra,
-				Comment:         col.Comment,
-			}
-			field.Selected = true //!!! be aware default is selected unless unselected after loading
-
-			table.Fields = append(table.Fields, field)
-		}
-		ret.Tables = append(ret.Tables, table)
-
-	}
 	if err := loader.LoadForeignKeys(ret); err != nil {
 		return nil, err
 	}

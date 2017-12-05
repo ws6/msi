@@ -532,10 +532,17 @@ func (self *Table) Insert(_updates map[string]interface{}) error {
 		}
 	}
 
-	if err := self.insert(_updates); err != nil {
-		return err
+	dl, ok := self.Schema.loader.(Dialect)
+	if ok {
+		if err := dl.Insert(self, _updates); err != nil {
+			return err
+		}
 	}
-
+	if !ok {
+		if err := self.insert(_updates); err != nil {
+			return err
+		}
+	}
 	if self.Schema != nil && self.Schema.LifeCycle != nil {
 		for _, f := range self.Schema.LifeCycle.AfterCreates {
 			if err := f(_updates); err != nil {
@@ -595,8 +602,16 @@ func (self *Table) Update(crit, updates map[string]interface{}) error {
 		}
 	}
 
-	if err := self.update(crit, updates); err != nil {
-		return err
+	dl, ok := self.Schema.loader.(Dialect)
+	if ok {
+		if err := dl.Update(self, crit, updates); err != nil {
+			return err
+		}
+	}
+	if !ok {
+		if err := self.update(crit, updates); err != nil {
+			return err
+		}
 	}
 
 	if self.Schema != nil && self.Schema.LifeCycle != nil {
@@ -652,8 +667,17 @@ func (self *Table) Remove(crit map[string]interface{}) error {
 		}
 	}
 
-	if err := self.remove(crit); err != nil {
-		return err
+	dl, ok := self.Schema.loader.(Dialect)
+	if ok {
+		if err := dl.Remove(self, crit); err != nil {
+			return err
+		}
+	}
+
+	if !ok {
+		if err := self.remove(crit); err != nil {
+			return err
+		}
 	}
 
 	if self.Schema != nil && self.Schema.LifeCycle != nil {

@@ -777,6 +777,10 @@ func (t *Table) find(others ...map[string]interface{}) (selectedFields []string,
 //Find filter out bad fields and correct types to make query
 func (t *Table) FindQuery(others ...map[string]interface{}) (string, error) {
 
+	if dl, ok := t.Schema.loader.(Dialect); ok {
+		return dl.FindQuery(t, others...)
+	}
+	//!!!below is mysql dialect by default
 	selectedFields, nonSelectClause, orderby, limit, offset, err := t.find(others...)
 	if err != nil {
 		return "", err
@@ -803,7 +807,9 @@ func (t *Table) FindQuery(others ...map[string]interface{}) (string, error) {
 
 //Count the field name out of this query is "count" in lowercase
 func (t *Table) CountQuery(others ...map[string]interface{}) (string, error) {
-
+	if dl, ok := t.Schema.loader.(Dialect); ok {
+		return dl.CountQuery(t, others...)
+	}
 	_, nonSelectClause, _, _, _, err := t.find(others...)
 	if err != nil {
 		return "", err

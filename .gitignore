@@ -21,3 +21,4 @@ sample_test.go
 *_test.go
 *test.go
 *.csv
+test/

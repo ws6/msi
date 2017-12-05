@@ -15,5 +15,5 @@ type DbSchema drivers.DbSchema
 
 type ShemaLoader interface {
 	LoadForeignKeys(*Msi) error
-	LoadDatabaseSchema(*Msi) (DbSchema, error)
+	LoadDatabaseSchema(*Msi) error
 }
