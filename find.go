@@ -490,7 +490,8 @@ func (t *Table) SafeWhere(crit map[string]interface{}) (string, error) {
 			//			}
 		}
 	}
-	whereClause := fmt.Sprintf(`WHERE TRUE  %s`, ToWhereString(wheres))
+
+	whereClause := fmt.Sprintf(`WHERE 1=1  %s`, ToWhereString(wheres))
 
 	return whereClause, nil
 

@@ -31,6 +31,10 @@ func (t *Table) SafeUpdate(updates map[string]interface{}) []string {
 }
 
 func (t *Table) UpdateQuery(crit, updates map[string]interface{}) (string, error) {
+
+	if dl, ok := t.Schema.loader.(Dialect); ok {
+		return dl.UpdateQuery(t, crit, updates)
+	}
 	up := t.SafeUpdate(updates)
 	ret := fmt.Sprintf(`UPDATE %s SET %s`,
 		t.TableName,

@@ -126,13 +126,10 @@ func (self *Table) GetPage(others ...map[string]interface{}) (*Page, error) {
 
 	ret := new(Page)
 	ret.Limit = self.Limit
+	//TODO others get analyzed three times. need to re-used the analyzed results
 	_, _, _, limit, offset, err := self.find(others...)
 	if err != nil {
 		return nil, err
-	}
-
-	if DEBUG {
-		log.Println(`limit->`, limit, `offset->`, offset)
 	}
 
 	if limit != 0 {
@@ -447,6 +444,7 @@ func ParseVal(_type string, v interface{}) interface{} {
 //Map https://github.com/jmoiron/sqlx/blob/master/sqlx.go#L820
 
 func (s *Stmt) Map(moreTypeMap ...map[string]string) ([]map[string]interface{}, error) {
+	//TODO allow interfaced
 	if s.table == nil || s.table.Schema == nil {
 		return nil, fmt.Errorf(`no table or db installed`)
 	}
@@ -532,17 +530,17 @@ func (self *Table) Insert(_updates map[string]interface{}) error {
 		}
 	}
 
-	dl, ok := self.Schema.loader.(Dialect)
-	if ok {
-		if err := dl.Insert(self, _updates); err != nil {
-			return err
-		}
+	//	dl, ok := self.Schema.loader.(Dialect)
+	//	if ok {
+	//		if err := dl.Insert(self, _updates); err != nil {
+	//			return err
+	//		}
+	//	}
+
+	if err := self.insert(_updates); err != nil {
+		return err
 	}
-	if !ok {
-		if err := self.insert(_updates); err != nil {
-			return err
-		}
-	}
+
 	if self.Schema != nil && self.Schema.LifeCycle != nil {
 		for _, f := range self.Schema.LifeCycle.AfterCreates {
 			if err := f(_updates); err != nil {
@@ -602,16 +600,15 @@ func (self *Table) Update(crit, updates map[string]interface{}) error {
 		}
 	}
 
-	dl, ok := self.Schema.loader.(Dialect)
-	if ok {
-		if err := dl.Update(self, crit, updates); err != nil {
-			return err
-		}
-	}
-	if !ok {
-		if err := self.update(crit, updates); err != nil {
-			return err
-		}
+	//	dl, ok := self.Schema.loader.(Dialect)
+	//	if ok {
+	//		if err := dl.Update(self, crit, updates); err != nil {
+	//			return err
+	//		}
+	//	}
+
+	if err := self.update(crit, updates); err != nil {
+		return err
 	}
 
 	if self.Schema != nil && self.Schema.LifeCycle != nil {
@@ -667,17 +664,15 @@ func (self *Table) Remove(crit map[string]interface{}) error {
 		}
 	}
 
-	dl, ok := self.Schema.loader.(Dialect)
-	if ok {
-		if err := dl.Remove(self, crit); err != nil {
-			return err
-		}
-	}
+	//	dl, ok := self.Schema.loader.(Dialect)
+	//	if ok {
+	//		if err := dl.Remove(self, crit); err != nil {
+	//			return err
+	//		}
+	//	}
 
-	if !ok {
-		if err := self.remove(crit); err != nil {
-			return err
-		}
+	if err := self.remove(crit); err != nil {
+		return err
 	}
 
 	if self.Schema != nil && self.Schema.LifeCycle != nil {
