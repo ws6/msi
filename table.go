@@ -35,7 +35,7 @@ func (self *Field) FullName() string {
 	if self.table == nil {
 		return self.Name
 	}
-
+	//TODO check if it is postgres?
 	return fmt.Sprintf("%s.%s", self.table.TableName, self.Name)
 }
 

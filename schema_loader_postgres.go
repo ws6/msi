@@ -17,8 +17,6 @@ package msi
 import (
 	"fmt"
 	"strings"
-
-	"github.com/mijia/modelq/drivers"
 )
 
 const POSTGRES = `postgres`
@@ -30,46 +28,141 @@ func init() {
 type PostgresLoader struct {
 }
 
-func (self *PostgresLoader) LoadDatabaseSchema(ret *Msi) error {
+func (self *PostgresLoader) getSchemnaDef(database string) string {
 
-	dbSchema, err := drivers.LoadDatabaseSchema(POSTGRES, ret.DsnString, ret.DatabaseName, ret.tableNames)
-	if err != nil {
-		return fmt.Errorf(`LoadDatabaseSchema err: %s`, err.Error())
+	ret := fmt.Sprintf(`select  
+table_name,
+udt_name as type_name,
+column_name 
+from INFORMATION_SCHEMA.COLUMNS 
+where table_catalog = '%s'
+and table_schema = 'public'`,
+		database,
+	)
+
+	//	if len(tables) > 0 {
+	//		_tables := []string{}
+	//		for _, t := range tables {
+	//			_tables = append(_tables, fmt.Sprintf(`'%s'`, t))
+	//		}
+	//		return fmt.Sprintf(`%s table_name in ( %s )`, strings.Join(_tables, " , "))
+	//	}
+	return ret
+}
+
+func (self *PostgresLoader) GetColumns(db *Msi) ([]map[string]interface{}, error) {
+	query := self.getSchemnaDef(db.DatabaseName)
+	typeMap := map[string]string{
+		`table_name`:  `string`,
+		`column_name`: `string`,
+
+		`type_name`: `string`,
 	}
 
-	for tbl, cols := range dbSchema {
-		fmt.Println(`postgres table`, tbl)
+	return db.Map(db.Db, query, typeMap)
+}
+
+func (self *PostgresLoader) DataType(dt string) string {
+	kFieldTypes := map[string]string{
+		"bigint":    "int64",
+		"int":       "int",
+		"integer":   "int",
+		"smallint":  "int",
+		"character": "string",
+		"text":      "string",
+		"timestamp": "time.Time",
+		"numeric":   "float64",
+		"boolean":   "bool", //timestamp without time zone
+	}
+	dt = strings.Split(dt, " ")[0]
+	if fieldType, ok := kFieldTypes[strings.ToLower(dt)]; !ok {
+		return "string"
+	} else {
+		return fieldType
+	}
+}
+
+func (self *PostgresLoader) LoadDatabaseSchema(db *Msi) error {
+
+	columns, err := self.GetColumns(db)
+	if err != nil {
+		return err
+	}
+
+	getTableColumns := func(tableName string, table *Table) ([]*Field, error) {
+		ret := []*Field{}
+		for _, col := range columns {
+			_tableName, err := ToString(col[`table_name`])
+			if err != nil {
+				return nil, err
+			}
+			if _tableName != tableName {
+				continue
+			}
+			_colName, err := ToString(col[`column_name`])
+			if err != nil {
+				return nil, err
+			}
+			_colType, err := ToString(col[`type_name`])
+			if err != nil {
+				return nil, err
+			}
+
+			ret = append(ret, &Field{
+				table:    table,
+				Name:     _colName,
+				Type:     self.DataType(_colType),
+				IsNumber: IsNumber(_colType),
+				Selected: true,
+			})
+		}
+		return ret, nil
+	}
+	//dsnString, schema, tableNames string
+	//	db, err := sql.Open(MSSQL, db.DsnString)
+	//TODO allow user cherry picking which tables
+	getTableQuery := fmt.Sprintf(
+		` 
+		select  
+table_name as name  
+from INFORMATION_SCHEMA.TABLES  
+where table_schema = 'public'
+and table_catalog= '%s'
+		
+;`, db.DatabaseName,
+	)
+
+	typeMap := map[string]string{
+		`name`: `string`,
+	}
+
+	tables, err := db.Map(db.Db, getTableQuery, typeMap)
+	if err != nil {
+		return err
+	}
+
+	for _, _table := range tables {
+		tableName, err := ToString(_table[`name`])
+		if err != nil {
+			return err
+		}
+
 		table := new(Table)
 		table.LifeCycle = new(LifeCycle)
-		table.TableName = tbl
+		table.TableName = tableName
 
-		table.Schema = ret
+		table.Schema = db
 		table.Limit = DEFAULT_LIMIT
-		for _, col := range cols {
-			field := &Field{
-				table:    table,
-				Name:     col.ColumnName,
-				Type:     col.DataType,
-				IsNumber: IsNumber(col.DataType),
-				//TODO ParseLength
-				IsNullable:      strings.ToUpper(col.IsNullable) == "YES",
-				JsonMeta:        fmt.Sprintf("`json:\"%s\"`", col.ColumnName),
-				IsPrimaryKey:    strings.ToUpper(col.ColumnKey) == "PRI",
-				IsUniqueKey:     strings.ToUpper(col.ColumnKey) == "UNI",
-				IsIndexed:       strings.ToUpper(col.ColumnKey) == "MUL",
-				IsAutoIncrement: strings.ToUpper(col.Extra) == "AUTO_INCREMENT",
-				DefaultValue:    col.DefaultValue,
-				Extra:           col.Extra,
-				Comment:         col.Comment,
-			}
-			field.Selected = true //!!! be aware default is selected unless unselected after loading
 
-			table.Fields = append(table.Fields, field)
+		table.Fields, err = getTableColumns(table.TableName, table)
+		if err != nil {
+			return err
 		}
-		ret.Tables = append(ret.Tables, table)
-
+		db.Tables = append(db.Tables, table)
 	}
+
 	return nil
+
 }
 
 var postgresFkTypeMape = map[string]string{
