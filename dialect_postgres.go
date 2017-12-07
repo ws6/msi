@@ -275,6 +275,23 @@ func (self *PostgresLoader) InsertQuery(t *Table, _updates map[string]interface{
 
 }
 
+func (self *PostgresLoader) GetForeignTableMap(t *Table) map[string]string {
+	ret := make(map[string]string)
+	for _, f := range t.Fields {
+		if f.ReferencedField == nil || f.ReferencedTable == nil {
+			continue
+		}
+		for _, rf := range f.ReferencedTable.Fields {
+			postgresK := fmt.Sprintf(`%s."%s"`, f.GetTableAlias(), rf.Name)
+			ret[postgresK] = rf.Type
+			//!!!unsafe key supports the URL hack. if key contains keywords, caller has to quote it.
+			unsafeKey := fmt.Sprintf("%s.%s", f.GetTableAlias(), rf.Name)
+			ret[unsafeKey] = rf.Type
+		}
+	}
+	return ret
+}
+
 func (self *PostgresLoader) SafeWhere(t *Table, crit map[string]interface{}) (string, error) {
 	if crit == nil {
 		return "", nil
@@ -287,24 +304,29 @@ func (self *PostgresLoader) SafeWhere(t *Table, crit map[string]interface{}) (st
 	}
 
 	wheres := []*Where{}
-	tableTypeMap := t.GetForeignTableMap()
-	allowedForeignKeyField := func(wf string) bool {
-		if _, ok := tableTypeMap[wf]; ok {
-			return true
+	tableTypeMap := self.GetForeignTableMap(t)
+	allowedForeignKeyField := func(wf string) string {
+		if newKey, ok := tableTypeMap[wf]; ok {
+			return newKey
 		}
-		return false
+		return ""
 	}
 	for _, where := range _wheres {
-		//!!!exception for special format foreign keys; and dont re-write it
-		if allowedForeignKeyField(where.FieldName) {
 
+		//!!!exception for special format foreign keys; and dont re-write it
+		// and Project__project_id."projectname" =  'Yale_Grigorenko_2'
+		newKey := allowedForeignKeyField(where.FieldName)
+		if newKey != "" {
+			//			where.FieldName = newKey
 			wheres = append(wheres, where)
 			continue
 		}
-		where.FieldName = fmt.Sprintf(`public."%s"."%s"`, t.TableName, where.FieldName)
+
+		safeFieldName := fmt.Sprintf(`public."%s"."%s"`, t.TableName, where.FieldName)
 		for _, field := range t.Fields {
 			//loosing the checker by allow tablename.fieldname format
-			if field.Name == where.FieldName || fmt.Sprintf(`%s.%s`, t.TableName, field.Name) == where.FieldName {
+			if field.Name == where.FieldName {
+				where.FieldName = safeFieldName
 				wheres = append(wheres, where)
 				continue
 			}
