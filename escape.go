@@ -1,6 +1,11 @@
 package msi
 
+var NO_ESCAPE = false
+
 func Escape(sql string) string {
+	if NO_ESCAPE {
+		return sql
+	}
 	dest := make([]byte, 0, 2*len(sql))
 	var escape byte
 	for i := 0; i < len(sql); i++ {

@@ -1,6 +1,12 @@
 package msi
 
+import (
+	"fmt"
+)
+
 var dialector = map[string]Dialect{}
+
+var ERR_USE_MYSQL = fmt.Errorf(`use_mysql_default_implementation`)
 
 type Dialect interface {
 	//	Insert(*Table, map[string]interface{}) error
@@ -17,5 +23,5 @@ type Dialect interface {
 	//	Find(t *Table, others ...map[string]interface{}) *Stmt
 	//	Count(s *Stmt) (int, error)
 	//	GetPage(t *Table, others ...map[string]interface{}) (*Page, error)
-	//	GetGroupCountPage(t *Table, others ...map[string]interface{}) (*Page, error)
+	GetGroupCountPage(t *Table, others ...map[string]interface{}) (*Page, error)
 }

@@ -394,3 +394,9 @@ func (self *PostgresLoader) RemoveQuery(t *Table, crit map[string]interface{}) (
 	ret := fmt.Sprintf(`DELETE FROM %s %s `, self.getTableName(t), whereClause)
 	return ret, nil
 }
+
+func (self *PostgresLoader) GetGroupCountPage(t *Table, others ...map[string]interface{}) (*Page, error) {
+
+	return nil, ERR_USE_MYSQL
+
+}

@@ -41,8 +41,9 @@ func InterfaceToString(i interface{}) string {
 	}
 
 	if tPtr, ok := i.(*time.Time); ok {
-		s := *tPtr
+
 		if tPtr != nil {
+			s := *tPtr
 			return fmt.Sprintf(sqlTimeFormatter, s.Year(), s.Month(), s.Day(), s.Hour(), s.Minute(), s.Second()) //TODO to be better formatted
 		}
 

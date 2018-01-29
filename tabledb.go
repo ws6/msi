@@ -57,6 +57,7 @@ func (self *Table) GetGroupCountPageCount(others ...map[string]interface{}) (int
 	//	https://stackoverflow.com/questions/14880080/mysql-sum-of-a-count-with-group-by-clause
 
 	countQuery := fmt.Sprintf(`SELECT count(*) as count FROM (%s) temp`, rawQuery)
+	fmt.Println(`countQuery`, countQuery)
 	if DEBUG {
 		fmt.Println(countQuery)
 	}
@@ -64,9 +65,9 @@ func (self *Table) GetGroupCountPageCount(others ...map[string]interface{}) (int
 		return 0, fmt.Errorf(`no schema pointer found from table[%s]`, self.TableName)
 	}
 	rows, err := self.Schema.Db.Query(countQuery)
-
+	fmt.Println(`rawQuery`, rawQuery)
 	if err != nil {
-		fmt.Println(rawQuery)
+
 		return 0, fmt.Errorf(`countQuery err:%s`, err.Error())
 	}
 	defer rows.Close()
@@ -83,15 +84,24 @@ func (self *Table) GetGroupCountPageCount(others ...map[string]interface{}) (int
 }
 
 func (self *Table) GetGroupCountPage(others ...map[string]interface{}) (*Page, error) {
+
+	if dl, ok := self.Schema.loader.(Dialect); ok {
+		res, err := dl.GetGroupCountPage(self, others...)
+		if err == nil {
+			return res, nil
+		}
+
+		if err != ERR_USE_MYSQL {
+			return nil, err
+		}
+	}
+
 	ret := new(Page)
 	ret.Limit = self.Limit
+	fmt.Println(`<- find ->GetGroupCountPageCount`)
 	_, _, _, limit, offset, err := self.find(others...)
 	if err != nil {
 		return nil, err
-	}
-
-	if DEBUG {
-		log.Println(`limit->`, limit, `offset->`, offset)
 	}
 
 	if limit != 0 {
@@ -103,11 +113,13 @@ func (self *Table) GetGroupCountPage(others ...map[string]interface{}) (*Page, e
 
 	go func(_wg *sync.WaitGroup) {
 		ret.Offset = offset
+		fmt.Println(`Find ->GetGroupCountPageCount`)
 		ret.Data, ret.FindErr = self.Find(others...).Map(map[string]string{`count`: `int`})
 		_wg.Done()
 	}(&wg)
 
 	go func(_wg *sync.WaitGroup) {
+		fmt.Println(`GetGroupCountPageCount`)
 		ret.Total, ret.CountErr = self.GetGroupCountPageCount(others...)
 		_wg.Done()
 	}(&wg)
@@ -366,8 +378,18 @@ func ParseByte(_type string, b []byte) interface{} {
 			var err error
 			var t time.Time
 			for _, format := range formats {
-				t, err = time.Parse(format, sb)
+				_sb := sb
+				//				formatLen := len(format)
+				//				if len(sb) >= formatLen {
+				//					_sb = sb[0 : formatLen-1]
+				//				}
+
+				t, err = time.Parse(format, _sb)
+
 				if err == nil {
+					//					if USE_LOCAL {
+					//						return t.Local()
+					//					}
 					return t
 				}
 
@@ -718,6 +740,9 @@ func (self *Msi) installForeignKeyMap() {
 }
 
 func (self *Msi) Map(db *sql.DB, query string, typeMap map[string]string) ([]map[string]interface{}, error) {
+	if DEBUG {
+		fmt.Println(query)
+	}
 	if self.ForeignKeyTypeMap == nil {
 		self.ForeignKeyTypeMap = make(map[string]string)
 	}
@@ -774,7 +799,24 @@ func (self *Msi) Map(db *sql.DB, query string, typeMap map[string]string) ([]map
 
 func (t *Table) FindOne(crit ...map[string]interface{}) (M, error) {
 
-	founds, err := t.Find(crit...).Map()
+	_crit := []map[string]interface{}{}
+	if crit == nil {
+		_crit = append(_crit, map[string]interface{}{})
+
+	}
+
+	for _, m := range crit {
+		_crit = append(_crit, m)
+	}
+
+	if len(_crit) == 1 {
+		_crit = append(_crit, map[string]interface{}{LIMIT: 1})
+	}
+	if len(_crit) >= 2 {
+		_crit[1][LIMIT] = 1
+	}
+
+	founds, err := t.Find(_crit...).Map()
 	if err != nil {
 		return nil, err
 	}

@@ -22,7 +22,10 @@ func ToInt(i interface{}) (int, error) {
 	if ret, ok := i.(int64); ok {
 		return int(ret), nil
 	}
-	return 0, fmt.Errorf(`not a int or int64`)
+	if f, err := ToFloat(i); err == nil {
+		return int(f), nil
+	}
+	return 0, fmt.Errorf(`not a int or int64 or float64`)
 }
 
 func ToFloat(i interface{}) (float64, error) {
@@ -34,13 +37,28 @@ func ToFloat(i interface{}) (float64, error) {
 }
 
 func ToTime(i interface{}) (*time.Time, error) {
-	if ret, ok := i.(time.Time); ok {
-		return &ret, nil
-	}
-	if ret, ok := i.(*time.Time); ok {
-		return ret, nil
-	}
+	//	if ret, ok := i.(time.Time); ok {
+	//		return &ret, nil
+	//	}
+	//	if ret, ok := i.(*time.Time); ok {
+	//		return ret, nil
+	//	}
 
+	if i == nil {
+		return nil, fmt.Errorf(`time is nil`)
+	}
+	switch v := i.(type) {
+	case time.Time:
+		return &v, nil
+	case *time.Time:
+		return v, nil
+	case string:
+		return ToTime(ParseByte(`time.Time`, []byte(v)))
+		//	case []byte:
+		//		return ToTime(ParseByte(`time.Time`, v))
+	default:
+		return nil, fmt.Errorf("I don't know about type %T!\n", v)
+	}
 	return nil, fmt.Errorf(`not a time.Time or *time.Time or nil`)
 }
 

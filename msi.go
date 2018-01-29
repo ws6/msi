@@ -6,7 +6,8 @@ import (
 )
 
 var (
-	DEBUG = false
+	DEBUG     = false
+	USE_LOCAL = true
 )
 
 type M map[string]interface{}

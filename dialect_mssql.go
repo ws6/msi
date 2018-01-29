@@ -3,6 +3,7 @@ package msi
 import (
 	"fmt"
 	"strings"
+	"sync"
 )
 
 func init() {
@@ -16,15 +17,31 @@ func (self *MSSQLLoader) getTableName(t *Table) string {
 		return t.TableName
 	}
 
-	return fmt.Sprintf("%s.dbo.%s",
+	return fmt.Sprintf("[%s].[dbo].[%s]",
 		t.Schema.DatabaseName,
 		t.TableName)
+}
+
+func (m *MSSQLLoader) FullName(self *Field) string {
+	if self.table == nil {
+		return self.Name
+	}
+	//TODO check if it is postgres?
+	return fmt.Sprintf("[%s].[%s]", self.table.TableName, self.Name)
+}
+
+func (m *MSSQLLoader) FullNameAS(self *Field, k, tableAlias string) string { // useing double underscores for uniqueness
+	if self.table == nil {
+		return self.Name
+	}
+
+	return fmt.Sprintf("[%s].[%s] AS %s__%s", tableAlias, self.Name, k, self.Name)
 }
 
 func (self *MSSQLLoader) find(t *Table, others ...map[string]interface{}) (selectedFields []string, nonSelectClause string, orderby []string, limit int, offset int, err error) {
 	for _, field := range t.Fields {
 		if field.Selected {
-			selectedFields = append(selectedFields, field.FullName())
+			selectedFields = append(selectedFields, self.FullName(field))
 		}
 	}
 
@@ -48,7 +65,7 @@ func (self *MSSQLLoader) find(t *Table, others ...map[string]interface{}) (selec
 		crit = others[0]
 	}
 
-	whereClause, _err := t.SafeWhere(crit)
+	whereClause, _err := self.SafeWhere(t, crit)
 	if _err != nil {
 		err = _err
 		return
@@ -131,7 +148,7 @@ func (self *MSSQLLoader) find(t *Table, others ...map[string]interface{}) (selec
 						err = fmt.Errorf(`no foreign field found [%s]`, _col)
 						return
 					}
-					foreignFields = append(foreignFields, foreignField.FullNameAS(fieldName, tableAlias))
+					foreignFields = append(foreignFields, self.FullNameAS(foreignField, fieldName, tableAlias))
 				}
 			}
 
@@ -143,13 +160,14 @@ func (self *MSSQLLoader) find(t *Table, others ...map[string]interface{}) (selec
 						continue
 					}
 
-					foreignFields = append(foreignFields, field.FullNameAS(fieldName, tableAlias))
+					foreignFields = append(foreignFields, self.FullNameAS(field, fieldName, tableAlias))
 				}
 			}
 			if len(selectedFields) == 0 {
-				selectedFields = append(selectedFields, fmt.Sprintf("%s.*", t.TableName))
+				selectedFields = append(selectedFields, fmt.Sprintf("[%s].*", t.TableName))
 			}
 			for _, k := range foreignFields {
+				//TODO safe guard foreignFields
 				selectedFields = append(selectedFields, k)
 			}
 		}
@@ -208,13 +226,14 @@ func (self *MSSQLLoader) FindQuery(t *Table, crit ...map[string]interface{}) (st
 	if err != nil {
 		return "", err
 	}
+	//TODO safe guard selectedField with square brackets
 	ret := fmt.Sprintf(`SELECT %s %s`, strings.Join(selectedFields, ", "), nonSelectClause)
 
 	//install orderby
 	if len(orderby) == 0 {
 		//!!!use first field instead of saying "id"
 		for _, f := range t.Fields {
-			orderby = append(orderby, f.Name)
+			orderby = append(orderby, self.FullName(f))
 			break
 		}
 	}
@@ -228,10 +247,11 @@ func (self *MSSQLLoader) FindQuery(t *Table, crit ...map[string]interface{}) (st
 	}
 
 	//!!! for MSSQL, limit and offset are manditory
+	if limit > 0 {
+		ret = fmt.Sprintf(`%s OFFSET %d ROWS`, ret, offset)
 
-	ret = fmt.Sprintf(`%s OFFSET %d ROWS`, ret, offset)
-
-	ret = fmt.Sprintf(`%s FETCH NEXT %d ROWS ONLY `, ret, limit)
+		ret = fmt.Sprintf(`%s FETCH NEXT %d ROWS ONLY `, ret, limit)
+	}
 
 	return ret, nil
 
@@ -248,8 +268,33 @@ func (self *MSSQLLoader) CountQuery(t *Table, others ...map[string]interface{}) 
 }
 
 func (self *MSSQLLoader) InsertQuery(t *Table, _updates map[string]interface{}) (string, error) {
+	q, err := self.insertQuery(t, _updates)
+	if err != nil {
+		return "", err
+	}
+
+	return q, nil
+}
+
+func (self *MSSQLLoader) MakeInsertFields(t *Table, updates []*NameVal) []string {
+	ret := []string{}
+
+	for _, item := range updates {
+		k := item.Name
+		if _f := t.GetField(k); _f == nil {
+			continue
+		}
+
+		ret = append(ret, fmt.Sprintf("[%s].[%s]", t.TableName, k))
+	}
+
+	return ret
+}
+
+func (self *MSSQLLoader) insertQuery(t *Table, _updates map[string]interface{}) (string, error) {
 
 	updates := []*NameVal{}
+
 	for k, v := range Stringify(_updates) {
 
 		if t.GetMyField(k) == nil {
@@ -262,7 +307,7 @@ func (self *MSSQLLoader) InsertQuery(t *Table, _updates map[string]interface{}) 
 	return fmt.Sprintf(
 		`INSERT INTO %s ( %s ) VALUES ( %s) ;`,
 		self.getTableName(t),
-		strings.Join(t.MakeInsertFields(updates), ","),
+		strings.Join(self.MakeInsertFields(t, updates), ","),
 		strings.Join(t.MakeInsertValues(updates), ","),
 	), nil
 
@@ -294,16 +339,14 @@ func (self *MSSQLLoader) SafeWhere(t *Table, crit map[string]interface{}) (strin
 			wheres = append(wheres, where)
 			continue
 		}
-		where.FieldName = fmt.Sprintf(`%s.%s`, t.TableName, where.FieldName)
+		where.FieldName = fmt.Sprintf(`[%s].[%s]`, t.TableName, where.FieldName)
 		for _, field := range t.Fields {
 			//loosing the checker by allow tablename.fieldname format
-			if field.Name == where.FieldName || fmt.Sprintf(`%s.%s`, t.TableName, field.Name) == where.FieldName {
+			if field.Name == where.FieldName || fmt.Sprintf(`[%s].[%s]`, t.TableName, field.Name) == where.FieldName {
 				wheres = append(wheres, where)
 				continue
 			}
-			//			if DEBUG {
-			//				log.Println(`where fieldname get filtered `, where.FieldName, t.TableName)
-			//			}
+
 		}
 	}
 
@@ -333,14 +376,14 @@ func (self *MSSQLLoader) SafeUpdate(t *Table, updates map[string]interface{}) []
 		if found == nil {
 			continue //wash out the bad fields
 		}
-		up = append(up, fmt.Sprintf("%s.%s=%s", t.TableName, k, _v))
+		up = append(up, fmt.Sprintf("[%s].[%s]=%s", t.TableName, k, _v))
 	}
 	return up
 }
 
 func (self *MSSQLLoader) UpdateQuery(t *Table, crit, updates map[string]interface{}) (string, error) {
-	//	up := self.SafeUpdate(t, updates)
-	up := t.SafeUpdate(updates)
+	up := self.SafeUpdate(t, updates)
+
 	ret := fmt.Sprintf(`UPDATE %s SET %s`,
 		self.getTableName(t),
 		strings.Join(up, ", "),
@@ -348,22 +391,101 @@ func (self *MSSQLLoader) UpdateQuery(t *Table, crit, updates map[string]interfac
 	if crit == nil {
 		return fmt.Sprintf("%s ;", ret), nil
 	}
-	whereClause, err := t.SafeWhere(crit)
+	whereClause, err := self.SafeWhere(t, crit)
 	if err != nil {
 		return "", err
 	}
 
 	ret = fmt.Sprintf(`%s %s;`, ret, whereClause)
-	fmt.Println(ret)
+
 	return ret, nil
 }
 
 //(t *Table) RemoveQuery(crit map[string]interface{}) (string, error)
 func (self *MSSQLLoader) RemoveQuery(t *Table, crit map[string]interface{}) (string, error) {
-	whereClause, err := t.SafeWhere(crit)
+	whereClause, err := self.SafeWhere(t, crit)
 	if err != nil {
 		return "", err
 	}
 	ret := fmt.Sprintf(`DELETE FROM %s %s `, self.getTableName(t), whereClause)
 	return ret, nil
+}
+
+func (self *MSSQLLoader) GetGroupCountPage(t *Table, others ...map[string]interface{}) (*Page, error) {
+	ret := new(Page)
+	ret.Limit = t.Limit
+
+	_, _, _, limit, offset, err := self.find(t, others...)
+	if err != nil {
+		return nil, err
+	}
+
+	if limit != 0 {
+		ret.Limit = limit
+	}
+	var wg sync.WaitGroup
+
+	wg.Add(2)
+
+	go func(_wg *sync.WaitGroup) {
+		ret.Offset = offset
+
+		ret.Data, ret.FindErr = t.Find(others...).Map(map[string]string{`count`: `int`})
+		_wg.Done()
+	}(&wg)
+
+	go func(_wg *sync.WaitGroup) {
+
+		ret.Total, ret.CountErr = self.GetGroupCountPageCount(t, others...)
+		_wg.Done()
+	}(&wg)
+	wg.Wait()
+
+	if ret.FindErr != nil {
+		return nil, fmt.Errorf(`find err: %s`, ret.FindErr.Error())
+	}
+	if ret.CountErr != nil {
+		return nil, fmt.Errorf(`count err: %s`, ret.CountErr.Error())
+	}
+	return ret, nil
+	return nil, ERR_USE_MYSQL
+
+}
+
+func (self *MSSQLLoader) GetGroupCountPageCount(t *Table, others ...map[string]interface{}) (int, error) {
+	selectedFields, nonSelectClause, _, _, _, err := self.find(t, others...)
+	if err != nil {
+		return 0, err
+	}
+	rawQuery := fmt.Sprintf(`SELECT %s %s`, strings.Join(selectedFields, ", "), nonSelectClause)
+
+	countQuery := fmt.Sprintf(`SELECT count(*) as count FROM (%s) temp`, rawQuery)
+	if DEBUG {
+		fmt.Println(`MSSQLLoader countQuery`, countQuery)
+	}
+	if DEBUG {
+		fmt.Println(countQuery)
+	}
+	if t.Schema == nil {
+		return 0, fmt.Errorf(`no schema pointer found from table[%s]`, t.TableName)
+	}
+	rows, err := t.Schema.Db.Query(countQuery)
+	if DEBUG {
+		fmt.Println(`MSSQLLoader rawQuery`, rawQuery)
+	}
+	if err != nil {
+
+		return 0, fmt.Errorf(`countQuery err:%s`, err.Error())
+	}
+	defer rows.Close()
+
+	var total int
+	for rows.Next() {
+		err := rows.Scan(&total)
+		if err != nil {
+			return 0, err
+		}
+		return total, nil
+	}
+	return 0, nil
 }
