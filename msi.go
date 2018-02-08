@@ -7,7 +7,7 @@ import (
 
 var (
 	DEBUG     = false
-	USE_LOCAL = true
+	USE_LOCAL = true //parser time into Local instead of UTC
 )
 
 type M map[string]interface{}

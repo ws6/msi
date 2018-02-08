@@ -374,6 +374,7 @@ func ParseByte(_type string, b []byte) interface{} {
 		return sb == `true` || sb == `1`
 	case `time.Time`:
 		{
+			fmt.Println(`parsing time from byte`, b)
 			formats := []string{`2006-01-02 15:04:05`, `2006-01-02`}
 			var err error
 			var t time.Time
@@ -383,6 +384,18 @@ func ParseByte(_type string, b []byte) interface{} {
 				//				if len(sb) >= formatLen {
 				//					_sb = sb[0 : formatLen-1]
 				//				}
+				if USE_LOCAL {
+					t, err := time.ParseInLocation(format, _sb, time.Local)
+					if err == nil {
+						return t
+					}
+					if err != nil {
+						if DEBUG {
+							log.Println(`wrong time formatter`, _type, sb, err.Error())
+						}
+
+					}
+				}
 
 				t, err = time.Parse(format, _sb)
 
@@ -575,7 +588,7 @@ func (self *Table) Insert(_updates map[string]interface{}) error {
 	if self.LifeCycle != nil {
 		for _, f := range self.LifeCycle.AfterCreates {
 			if err := f(_updates); err != nil {
-				return err
+				return fmt.Errorf(`AfterCreates err:%s`, err.Error())
 			}
 
 		}

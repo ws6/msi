@@ -37,6 +37,35 @@ func ToFloat(i interface{}) (float64, error) {
 }
 
 func ToTime(i interface{}) (*time.Time, error) {
+	t, err := toTime(i)
+	if err != nil {
+		return nil, err
+	}
+	if USE_LOCAL {
+		if t == nil {
+			return t, err
+		}
+		if t.Location() == time.UTC {
+			//TODO UTC To Local
+			_t := time.Date(
+				t.Year(),
+				t.Month(),
+				t.Day(),
+				t.Hour(),
+				t.Minute(),
+				t.Second(),
+				t.Nanosecond(),
+				time.Local,
+			)
+			return &_t, nil
+		}
+
+	}
+
+	return t, nil
+}
+
+func toTime(i interface{}) (*time.Time, error) {
 	//	if ret, ok := i.(time.Time); ok {
 	//		return &ret, nil
 	//	}
@@ -53,7 +82,7 @@ func ToTime(i interface{}) (*time.Time, error) {
 	case *time.Time:
 		return v, nil
 	case string:
-		return ToTime(ParseByte(`time.Time`, []byte(v)))
+		return toTime(ParseByte(`time.Time`, []byte(v)))
 		//	case []byte:
 		//		return ToTime(ParseByte(`time.Time`, v))
 	default:
