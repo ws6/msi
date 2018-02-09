@@ -2,6 +2,7 @@ package msi
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 )
 
@@ -25,7 +26,11 @@ func ToInt(i interface{}) (int, error) {
 	if f, err := ToFloat(i); err == nil {
 		return int(f), nil
 	}
-	return 0, fmt.Errorf(`not a int or int64 or float64`)
+
+	if f, err := ToString(i); err == nil {
+		return strconv.Atoi(f)
+	}
+	return 0, fmt.Errorf(`not a int or int64 or float64 or a string`)
 }
 
 func ToFloat(i interface{}) (float64, error) {
