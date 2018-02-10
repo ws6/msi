@@ -374,7 +374,7 @@ func ParseByte(_type string, b []byte) interface{} {
 		return sb == `true` || sb == `1`
 	case `time.Time`:
 		{
-			fmt.Println(`parsing time from byte`, b)
+
 			formats := []string{`2006-01-02 15:04:05`, `2006-01-02`}
 			var err error
 			var t time.Time
