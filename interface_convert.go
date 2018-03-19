@@ -15,6 +15,25 @@ func ToString(i interface{}) (string, error) {
 	}
 	return ret, nil
 }
+
+func ToInt64(i interface{}) (int64, error) {
+	if ret, ok := i.(int); ok {
+		return int64(ret), nil
+	}
+
+	if ret, ok := i.(int64); ok {
+		return ret, nil
+	}
+	if f, err := ToFloat(i); err == nil {
+		return int64(f), nil
+	}
+
+	if f, err := ToString(i); err == nil {
+		return strconv.ParseInt(f, 10, 64)
+	}
+	return 0, fmt.Errorf(`not a int or int64 or float64 or a string`)
+}
+
 func ToInt(i interface{}) (int, error) {
 	if ret, ok := i.(int); ok {
 		return ret, nil
@@ -34,11 +53,19 @@ func ToInt(i interface{}) (int, error) {
 }
 
 func ToFloat(i interface{}) (float64, error) {
-	ret, ok := i.(float64)
-	if !ok {
-		return float64(0), fmt.Errorf(`not a float64 [%v]`, i)
+	if ret, ok := i.(float64); ok {
+		return ret, nil
+
 	}
-	return ret, nil
+	if s, ok := i.(string); ok {
+		return strconv.ParseFloat(s, 64)
+	}
+	if b, ok := i.([]byte); ok {
+		return strconv.ParseFloat(string(b), 64)
+	}
+
+	return float64(0), fmt.Errorf(`not a float64 [%v]`, i)
+
 }
 
 func ToTime(i interface{}) (*time.Time, error) {

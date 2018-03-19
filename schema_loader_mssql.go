@@ -89,7 +89,7 @@ func (self *MSSQLLoader) DataType(colDataType string) string {
 
 		"int":     "int",
 		"tinyint": "int",
-		"bigint":  "int",
+		"bigint":  "int64",
 
 		"smallint": "int",
 
