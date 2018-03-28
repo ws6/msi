@@ -2,6 +2,7 @@ package msi
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -37,6 +38,56 @@ func (m *MSSQLLoader) FullNameAS(self *Field, k, tableAlias string) string { // 
 
 	return fmt.Sprintf("[%s].[%s] AS %s__%s", tableAlias, self.Name, k, self.Name)
 }
+
+type SinceField struct {
+	By        string
+	FieldName string
+	GTE       *int //greater equal than, if negative, ignore
+	LT        *int // less than , if negative igore
+}
+
+func (o *SinceField) SelectFieldName() string {
+	return fmt.Sprintf(` DATEDIFF(%s, %s, getdate()) as %s  `, o.By, o.FieldName, o.AsName())
+}
+func (o *SinceField) AsName() string {
+	return fmt.Sprintf(`%s_since_%s`, o.By, o.FieldName)
+}
+
+func NewSinceField(f string) *SinceField {
+	by := `day`
+	fieldName := f
+	_f := strings.Split(f, ",") // the first one is field name and the second one is precision
+	if len(_f) >= 2 {
+		fieldName = _f[0]
+		by = _f[1]
+	}
+
+	ret := new(SinceField)
+	ret.By = by
+	ret.FieldName = fieldName
+
+	if len(_f) >= 4 {
+		if n, err := strconv.Atoi(_f[2]); err == nil {
+			ret.GTE = &n
+		}
+		if n, err := strconv.Atoi(_f[3]); err == nil {
+			ret.LT = &n
+		}
+
+	}
+	return ret
+}
+
+//func (self *MSSQLLoader) ToSinceField(f string) string {
+//	by := `day`
+//	fieldName := f
+//	_f := strings.Split(f, ",") // the first one is field name and the second one is precision
+//	if len(_f) >= 2 {
+//		fieldName = _f[0]
+//		by = _f[1]
+//	}
+//	return fmt.Sprintf(` DATEDIFF(%s, %s, getdate()) as %s_since_%s  `, by, fieldName, by, fieldName)
+//}
 
 func (self *MSSQLLoader) find(t *Table, others ...map[string]interface{}) (selectedFields []string, nonSelectClause string, orderby []string, limit int, offset int, err error) {
 	for _, field := range t.Fields {
@@ -193,13 +244,30 @@ func (self *MSSQLLoader) find(t *Table, others ...map[string]interface{}) (selec
 
 		selectedFields = []string{} //clean out previous
 		for _, f := range mq.GroupCountBy {
+
 			selectedFields = append(selectedFields, f)
 		}
 		selectedFields = append(selectedFields, `count(*) as count`)
 		nonSelectClause = fmt.Sprintf(`%s GROUP BY %s`, nonSelectClause, strings.Join(mq.GroupCountBy, " ,"))
 
 	}
+	if len(mq.SinceCountby) > 0 {
 
+		for _, f := range mq.SinceCountby {
+			//only change the selected fields
+			//			by := `day`
+			//			fieldName := f
+			//			_f := strings.Split(f, ",") // the first one is field name and the second one is precision
+			//			if len(_f) >= 2 {
+			//				fieldName = _f[0]
+			//				by = _f[1]
+			//			}
+
+			field := NewSinceField(f).SelectFieldName()
+			selectedFields = append(selectedFields, field)
+		}
+		//TODO parse since countby  createdon,day|due_date,hour
+	}
 	if len(mq.Orderby) > 0 {
 		orderby = mq.Orderby
 	}
@@ -448,7 +516,6 @@ func (self *MSSQLLoader) GetGroupCountPage(t *Table, others ...map[string]interf
 		return nil, fmt.Errorf(`count err: %s`, ret.CountErr.Error())
 	}
 	return ret, nil
-	return nil, ERR_USE_MYSQL
 
 }
 
@@ -488,4 +555,107 @@ func (self *MSSQLLoader) GetGroupCountPageCount(t *Table, others ...map[string]i
 		return total, nil
 	}
 	return 0, nil
+}
+
+func (self *MSSQLLoader) GetSinceCountPageTotal(t *Table, others ...map[string]interface{}) (int, error) {
+	return 0, nil
+}
+func (self *MSSQLLoader) GetSinceCountPageSum(t *Table, others ...map[string]interface{}) (int, error) {
+	return 0, nil
+}
+
+func (self *MSSQLLoader) GetSinceCountQuery(t *Table, others ...map[string]interface{}) (string, error) {
+	mq, err := t.ParseMetaQuery(others[1])
+	if err != nil {
+		return "", err
+	}
+	if len(mq.SinceCountby) == 0 {
+		return "", fmt.Errorf(`no sincecountby field ,e.g. createdon,day`)
+	}
+	selectedFields, nonSelectClause, _, _, _, err := self.find(t, others...)
+	if err != nil {
+		return "", err
+	}
+	rawQuery := fmt.Sprintf(`SELECT %s %s`, strings.Join(selectedFields, ", "), nonSelectClause)
+
+	sinceField := mq.SinceCountby[0]
+	//	self.ToSinceField(sinceField)
+	s := NewSinceField(sinceField)
+	//TODO adding where, group by, order by, offset, limit
+
+	//making new query
+	newQuery := fmt.Sprintf(
+		`SELECT  %s , count(*) as count  FROM (%s) temp  WHERE 1=1`,
+		s.AsName(), rawQuery,
+	)
+
+	if s.GTE != nil {
+		newQuery = fmt.Sprintf(`%s AND %s >= %d `, newQuery, s.AsName(), *s.GTE)
+	}
+
+	if s.LT != nil {
+		newQuery = fmt.Sprintf(`%s AND %s < %d `, newQuery, s.AsName(), *s.LT)
+	}
+
+	newQuery = fmt.Sprintf(`%s group by %s  `, newQuery, s.AsName())
+	return newQuery, nil
+}
+
+func (self *MSSQLLoader) GetSinceCountPage(t *Table, others ...map[string]interface{}) (*Page, error) {
+
+	mq, err := t.ParseMetaQuery(others[1])
+	if err != nil {
+		return nil, err
+	}
+	sinceField := mq.SinceCountby[0]
+	s := NewSinceField(sinceField)
+
+	ret := new(Page)
+	ret.Limit = t.Limit
+	if mq.Limit > 0 {
+		ret.Limit = mq.Limit
+	}
+	ret.Offset = mq.Offset
+	_newQuery, err := self.GetSinceCountQuery(t, others...)
+	if err != nil {
+		return nil, err
+	}
+	//TODO do count query
+	countQuery := fmt.Sprintf(`SELECT count(*) as count FROM (%s) temp1`, _newQuery)
+	counts, err := t.Schema.Map(t.Schema.Db, countQuery, map[string]string{`count`: `int`})
+	if err != nil {
+		return nil, err
+	}
+	for _, _count := range counts {
+		if cnt, err := ToInt(_count[`count`]); err == nil {
+
+			ret.Total = cnt
+			break
+		}
+
+	}
+
+	newQuery := fmt.Sprintf(` 
+	 
+	%s 
+	order by %s
+	offset %d rows  Fetch next %d rows only `, _newQuery, s.AsName(), ret.Offset, ret.Limit)
+
+	fmt.Println(newQuery)
+
+	typMap := make(map[string]string)
+	typMap[s.AsName()] = `int`
+	typMap[`count`] = `int`
+	founds, err := t.Schema.Map(t.Schema.Db, newQuery, typMap)
+	if err != nil {
+		return nil, err
+	}
+	for _, found := range founds {
+		if cnt, err := ToInt(found[`count`]); err == nil {
+			ret.Sum += cnt
+		}
+	}
+	ret.Data = founds
+	//calculate summation
+	return ret, nil
 }

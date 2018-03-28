@@ -59,6 +59,7 @@ type QueryParams struct {
 	SortBy       []string
 	GroupBy      []string
 	GroupCountBy []string
+	SinceCountBy []string
 	Populates    []string //simple form for left join
 }
 
@@ -350,6 +351,10 @@ func Build(c CanGet, fieldMap map[string]string) (*QueryParams, error) {
 	}
 	if groupCountBy := c.Get(`_groupcountby`); groupCountBy != "" {
 		ret.GroupCountBy = strings.Split(groupCountBy, ",")
+
+	}
+	if sinceCountBy := c.Get(`_sincecountby`); sinceCountBy != "" {
+		ret.SinceCountBy = strings.Split(sinceCountBy, "|")
 
 	}
 

@@ -42,6 +42,7 @@ const (
 	LIMIT        = `$limit`
 	GROUPBY      = `$groupby`
 	GROUPCOUNTBY = `$groupcountby`
+	SINCECOUNTBY = `$sincecountby`
 
 	ORDERBY = `$orderby`
 )
@@ -59,6 +60,8 @@ func IsMetaQuery(op string) bool {
 	case GROUPBY:
 		return true
 	case GROUPCOUNTBY:
+		return true
+	case SINCECOUNTBY:
 		return true
 	case ORDERBY:
 		return true
@@ -503,6 +506,7 @@ type MetaQuery struct {
 	Limit        int
 	GroupBy      []string
 	GroupCountBy []string //special grouping will replace select fields
+	SinceCountby []string
 	Fields       []string
 	Joins        []string
 	Populates    []string
@@ -559,6 +563,8 @@ func ParseMetaQuery(crit map[string]interface{}) (*MetaQuery, error) {
 			ret.GroupBy = InterfaceToStringArray(v)
 		case GROUPCOUNTBY:
 			ret.GroupCountBy = InterfaceToStringArray(v)
+		case SINCECOUNTBY:
+			ret.SinceCountby = InterfaceToStringArray(v)
 
 		case FIELDS:
 			ret.Fields = InterfaceToStringArray(v)

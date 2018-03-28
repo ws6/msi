@@ -29,8 +29,8 @@ type Stmt struct {
 
 //Page one page of results with Total count information
 type Page struct {
-	Total int
-
+	Total  int
+	Sum    int
 	Limit  int
 	Offset int
 
@@ -83,6 +83,20 @@ func (self *Table) GetGroupCountPageCount(others ...map[string]interface{}) (int
 	return 0, nil
 }
 
+func (self *Table) GetSinceCountPage(others ...map[string]interface{}) (*Page, error) {
+	if dl, ok := self.Schema.loader.(Dialect); ok {
+		res, err := dl.GetSinceCountPage(self, others...)
+		if err == nil {
+			return res, nil
+		}
+
+		if err != ERR_USE_MYSQL {
+			return nil, err
+		}
+	}
+	return nil, ERR_NOT_IMPL
+}
+
 func (self *Table) GetGroupCountPage(others ...map[string]interface{}) (*Page, error) {
 
 	if dl, ok := self.Schema.loader.(Dialect); ok {
@@ -98,7 +112,7 @@ func (self *Table) GetGroupCountPage(others ...map[string]interface{}) (*Page, e
 
 	ret := new(Page)
 	ret.Limit = self.Limit
-	fmt.Println(`<- find ->GetGroupCountPageCount`)
+
 	_, _, _, limit, offset, err := self.find(others...)
 	if err != nil {
 		return nil, err
@@ -113,13 +127,13 @@ func (self *Table) GetGroupCountPage(others ...map[string]interface{}) (*Page, e
 
 	go func(_wg *sync.WaitGroup) {
 		ret.Offset = offset
-		fmt.Println(`Find ->GetGroupCountPageCount`)
+
 		ret.Data, ret.FindErr = self.Find(others...).Map(map[string]string{`count`: `int`})
 		_wg.Done()
 	}(&wg)
 
 	go func(_wg *sync.WaitGroup) {
-		fmt.Println(`GetGroupCountPageCount`)
+
 		ret.Total, ret.CountErr = self.GetGroupCountPageCount(others...)
 		_wg.Done()
 	}(&wg)

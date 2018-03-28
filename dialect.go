@@ -24,4 +24,5 @@ type Dialect interface {
 	//	Count(s *Stmt) (int, error)
 	//	GetPage(t *Table, others ...map[string]interface{}) (*Page, error)
 	GetGroupCountPage(t *Table, others ...map[string]interface{}) (*Page, error)
+	GetSinceCountPage(t *Table, others ...map[string]interface{}) (*Page, error)
 }

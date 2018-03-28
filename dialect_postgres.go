@@ -400,3 +400,8 @@ func (self *PostgresLoader) GetGroupCountPage(t *Table, others ...map[string]int
 	return nil, ERR_USE_MYSQL
 
 }
+
+func (self *PostgresLoader) GetSinceCountPage(t *Table, others ...map[string]interface{}) (*Page, error) {
+
+	return nil, ERR_USE_MYSQL
+}
