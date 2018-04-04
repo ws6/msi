@@ -401,6 +401,10 @@ func (self *MSSQLLoader) SafeWhere(t *Table, crit map[string]interface{}) (strin
 		return false
 	}
 	for _, where := range _wheres {
+		if where.Protected {
+			wheres = append(wheres, where)
+			continue
+		}
 		//!!!exception for special format foreign keys; and dont re-write it
 		if allowedForeignKeyField(where.FieldName) {
 

@@ -1,7 +1,7 @@
 package querybuilder
 
 import (
-	//	"encoding/json"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -383,7 +383,7 @@ func Build(c CanGet, fieldMap map[string]string) (*QueryParams, error) {
 			ret.Fields[k] = 1
 		}
 	}
-	//	b, _ := json.MarshalIndent(ret, "", "    ")
-	//	fmt.Println(string(b))
+	b, _ := json.MarshalIndent(ret, "", "    ")
+	fmt.Println(string(b))
 	return ret, nil
 }

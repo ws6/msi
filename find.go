@@ -1,6 +1,7 @@
 package msi
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	//	"reflect"
@@ -174,6 +175,8 @@ type Where struct {
 	Operator      string //https://dev.mysql.com/doc/refman/5.7/en/comparison-operators.html
 	FieldName     string // actual field name
 	Value         interface{}
+
+	Protected bool //for String() function
 }
 
 func NewWhere(logicOp, compOp string) *Where {
@@ -325,7 +328,38 @@ func (w *Where) GetValueString() string {
 	return ""
 }
 
+//ProtectedString for $and and $or
+func (w *Where) ProtectedString() string {
+	wheres, ok := w.Value.([]*Where)
+	if !ok {
+		fmt.Println(`bad nested where`)
+		return ""
+	}
+
+	ret := []string{}
+	for _, w := range wheres {
+		fmt.Println(`OR>>>>>>>>>>>>> %s`, w.String())
+		ret = append(ret, w.String())
+	}
+	//	return strings.Join(ret, " ")
+	cnn := ` 1=1 `
+	if w.LogicOperator == OR {
+		cnn = ` 1!=1 `
+	}
+	return fmt.Sprintf(
+		` AND ( %s %s  ) `,
+		cnn,
+		strings.Join(ret, " "),
+	)
+
+}
+
 func (w *Where) String() string {
+	if w.Protected {
+		_r := w.ProtectedString()
+		fmt.Println(_r)
+		return _r
+	}
 	//TODO print values
 	if w.Operator == EQ {
 
@@ -429,6 +463,35 @@ func ParseWhere(crit map[string]interface{}, ret *[]*Where, logicOp, compOp, fie
 			ParseWhere(_crit, ret, _logicOp, _compOp, _fieldname, err)
 			continue
 		}
+		//!!!combine them
+
+		if k == AND || k == OR {
+			if !IsArray(v) {
+				err.Message = `AND or OR not having array values`
+				return
+			}
+			arr, ok := v.([]interface{})
+			if !ok {
+				err.Message = `AND or OR not having array values`
+				return
+			}
+			_ret := []*Where{}
+			_err := new(WhereErr)
+
+			for _, _i := range arr {
+				if __crit, ok := _i.(map[string]interface{}); ok {
+					ParseWhere(__crit, &_ret, k, "", "", _err)
+				}
+
+			}
+			//value must be slice
+
+			_where := NewWhere(k, compOp)
+			_where.Protected = true //over write String() and by pass SafeWhere()
+			_where.Value = _ret
+			*ret = append(*ret, _where)
+			continue
+		}
 
 		where := NewWhere(logicOp, compOp)
 
@@ -444,10 +507,15 @@ func ParseWhere(crit map[string]interface{}, ret *[]*Where, logicOp, compOp, fie
 			where.FieldName = fieldname
 		}
 		if where.FieldName == "" {
-			err.Message = fmt.Sprintf(`no field name found at where v=%+v`, v)
+			b, _ := json.Marshal(v)
+			err.Message = fmt.Sprintf(`no field name found at where [k=%s] %v ; IsArray(v) %s`, k, v, IsArray(v), string(b))
+			//			fmt.Println(err.Message)
+			//			err.Message = string(b)
+			//			fmt.Println(string(b))
 			return
 		}
 		if isOperator(where.FieldName) {
+
 			err.Message = fmt.Sprintf(`wrong usage on fieldname[%s], it is defined as opertor`, where.FieldName)
 			return
 		}
@@ -491,6 +559,10 @@ func (t *Table) SafeWhere(crit map[string]interface{}) (string, error) {
 		return false
 	}
 	for _, where := range _wheres {
+		if where.Protected {
+			wheres = append(wheres, where)
+			continue
+		}
 		//!!!exception for special format foreign keys; and dont re-write it
 		if allowedForeignKeyField(where.FieldName) {
 			if DEBUG {
@@ -513,7 +585,7 @@ func (t *Table) SafeWhere(crit map[string]interface{}) (string, error) {
 	}
 
 	whereClause := fmt.Sprintf(`WHERE 1=1  %s`, ToWhereString(wheres))
-
+	fmt.Println(whereClause)
 	return whereClause, nil
 
 }
