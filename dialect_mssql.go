@@ -641,8 +641,6 @@ func (self *MSSQLLoader) GetSinceCountPage(t *Table, others ...map[string]interf
 	order by %s
 	offset %d rows  Fetch next %d rows only `, _newQuery, s.AsName(), ret.Offset, ret.Limit)
 
-	fmt.Println(newQuery)
-
 	typMap := make(map[string]string)
 	typMap[s.AsName()] = `int`
 	typMap[`count`] = `int`

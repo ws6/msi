@@ -15,6 +15,7 @@ import (
 
 const (
 	IS_NOT_NULL = `IS NOT NULL`
+	IS_NULL     = `IS NULL`
 	UNLIMIT     = -1
 	//logical operators
 	AND = `$and`
@@ -32,8 +33,9 @@ const (
 	IN  = `$in`  //need values
 	NIN = `$nin` //need values
 	//existence operators
-	EXISTS = `$exists` //if value is true then field is not null; else field is null
-	LIKE   = `$like`
+	EXISTS     = `$exists` //if value is true then field is not null; else field is null
+	NOT_EXISTS = `$null`   //if value is true then field is not null; else field is null
+	LIKE       = `$like`
 	//meta query constants
 	FIELDS       = `$fields`    // not part of SQL syntax; for overwritting the default field selection
 	JOINS        = `$joins`     // not part of SQL syntax
@@ -103,6 +105,9 @@ func ToSQLOperator(op string) string {
 		return `NOT IN`
 	case EXISTS:
 		return IS_NOT_NULL
+	case NOT_EXISTS:
+		return IS_NULL
+		//NOT_EXISTS
 	case LIKE:
 		return `LIKE`
 	}
@@ -151,6 +156,8 @@ func IsComputeOperator(op string) bool {
 	case NIN:
 		return true
 	case EXISTS:
+		return true
+	case NOT_EXISTS:
 		return true
 	case LIKE:
 		return true
@@ -325,6 +332,10 @@ func (w *Where) String() string {
 		if w.GetValueString() == fmt.Sprintf("'%s'", EXISTS) {
 			return fmt.Sprintf(`%s %s %s`, ToSQLOperator(w.LogicOperator), w.FieldName, ToSQLOperator(EXISTS))
 		}
+
+		if w.GetValueString() == fmt.Sprintf("'%s'", NOT_EXISTS) {
+			return fmt.Sprintf(`%s %s %s`, ToSQLOperator(w.LogicOperator), w.FieldName, ToSQLOperator(NOT_EXISTS))
+		}
 	}
 
 	if w.Operator == LIKE {
@@ -343,6 +354,13 @@ func (w *Where) String() string {
 	}
 
 	if w.Operator == EXISTS {
+		return fmt.Sprintf(`%s %s %s`,
+			ToSQLOperator(w.LogicOperator),
+			w.FieldName,
+			ToSQLOperator(w.Operator),
+		)
+	}
+	if w.Operator == NOT_EXISTS {
 		return fmt.Sprintf(`%s %s %s`,
 			ToSQLOperator(w.LogicOperator),
 			w.FieldName,

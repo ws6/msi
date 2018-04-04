@@ -8,6 +8,14 @@ import (
 
 //interface converter : provides a list of helper functions; none of these shall be the core of msi
 
+func ToBool(i interface{}) (bool, error) {
+	ret, ok := i.(bool)
+	if !ok {
+		return false, fmt.Errorf(`not a bool, [%v]`, i)
+	}
+	return ret, nil
+}
+
 func ToString(i interface{}) (string, error) {
 	ret, ok := i.(string)
 	if !ok {
