@@ -75,6 +75,16 @@ func IsMetaQuery(op string) bool {
 	}
 	return false
 }
+func getOperators() []string {
+	ret := []string{"="}
+	ops := []string{
+		AND, OR, XOR, GT, LT, GTE, LTE, EQ, IS, NE, IN, NIN, EXISTS, NOT_EXISTS, LIKE,
+	}
+	for _, op := range ops {
+		ret = append(ret, ToSQLOperator(op))
+	}
+	return ret
+}
 
 func ToSQLOperator(op string) string {
 	switch op {
@@ -338,7 +348,7 @@ func (w *Where) ProtectedString() string {
 
 	ret := []string{}
 	for _, w := range wheres {
-		fmt.Println(`OR>>>>>>>>>>>>> %s`, w.String())
+
 		ret = append(ret, w.String())
 	}
 	//	return strings.Join(ret, " ")
@@ -509,9 +519,7 @@ func ParseWhere(crit map[string]interface{}, ret *[]*Where, logicOp, compOp, fie
 		if where.FieldName == "" {
 			b, _ := json.Marshal(v)
 			err.Message = fmt.Sprintf(`no field name found at where [k=%s] %v ; IsArray(v) %s`, k, v, IsArray(v), string(b))
-			//			fmt.Println(err.Message)
-			//			err.Message = string(b)
-			//			fmt.Println(string(b))
+
 			return
 		}
 		if isOperator(where.FieldName) {
@@ -559,6 +567,7 @@ func (t *Table) SafeWhere(crit map[string]interface{}) (string, error) {
 		return false
 	}
 	for _, where := range _wheres {
+
 		if where.Protected {
 			wheres = append(wheres, where)
 			continue

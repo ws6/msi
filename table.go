@@ -59,6 +59,8 @@ type Table struct {
 
 	JoinAlias string //used when join queries envoled; for use space
 	Fields    []*Field
+
+	unsafeFieldsPatterns []*pattern
 }
 
 func IsNumber(t string) bool {

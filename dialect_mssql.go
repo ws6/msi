@@ -287,6 +287,34 @@ func (self *MSSQLLoader) find(t *Table, others ...map[string]interface{}) (selec
 	return
 }
 
+type pattern struct {
+	pat      string
+	field    *Field
+	operator string
+}
+
+//replaceUnsafeFields a patch for remove unsafe field names
+func (self *MSSQLLoader) replaceUnsafeFields(t *Table, sql string) string {
+	//getOperators
+	if len(t.unsafeFieldsPatterns) == 0 {
+		unsafeFieldsPatterns := []*pattern{}
+		for _, field := range t.Fields {
+			for _, op := range getOperators() {
+				pat := pattern{fmt.Sprintf(` %s %s `, field.Name, op), field, op}
+
+				unsafeFieldsPatterns = append(unsafeFieldsPatterns, &pat)
+			}
+		}
+		t.unsafeFieldsPatterns = unsafeFieldsPatterns
+	}
+	for _, pat := range t.unsafeFieldsPatterns {
+		toreplace := fmt.Sprintf(` %s %s `, self.FullName(pat.field), pat.operator)
+		sql = strings.Replace(sql, pat.pat, toreplace, -1)
+	}
+
+	return sql
+}
+
 func (self *MSSQLLoader) FindQuery(t *Table, crit ...map[string]interface{}) (string, error) {
 
 	//!!!below is mysql dialect by default
@@ -321,7 +349,9 @@ func (self *MSSQLLoader) FindQuery(t *Table, crit ...map[string]interface{}) (st
 		ret = fmt.Sprintf(`%s FETCH NEXT %d ROWS ONLY `, ret, limit)
 	}
 
-	return ret, nil
+	//	return ret, nil
+
+	return self.replaceUnsafeFields(t, ret), nil
 
 }
 
@@ -331,7 +361,7 @@ func (self *MSSQLLoader) CountQuery(t *Table, others ...map[string]interface{}) 
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf(`SELECT count(*) as count %s`, nonSelectClause), nil
+	return fmt.Sprintf(`SELECT count(*) as count %s`, self.replaceUnsafeFields(t, nonSelectClause)), nil
 
 }
 
@@ -401,6 +431,7 @@ func (self *MSSQLLoader) SafeWhere(t *Table, crit map[string]interface{}) (strin
 		return false
 	}
 	for _, where := range _wheres {
+
 		if where.Protected {
 			wheres = append(wheres, where)
 			continue
@@ -411,10 +442,13 @@ func (self *MSSQLLoader) SafeWhere(t *Table, crit map[string]interface{}) (strin
 			wheres = append(wheres, where)
 			continue
 		}
+
 		where.FieldName = fmt.Sprintf(`[%s].[%s]`, t.TableName, where.FieldName)
+
 		for _, field := range t.Fields {
 			//loosing the checker by allow tablename.fieldname format
 			if field.Name == where.FieldName || fmt.Sprintf(`[%s].[%s]`, t.TableName, field.Name) == where.FieldName {
+
 				wheres = append(wheres, where)
 				continue
 			}
