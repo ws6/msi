@@ -179,7 +179,7 @@ func (self *MSSQLLoader) find(t *Table, others ...map[string]interface{}) (selec
 			//			tableAlias := fmt.Sprintf("%s__%s", field.ReferencedTable.TableName, field.Name)
 			tableAlias := field.GetTableAlias()
 			leftjoins = append(leftjoins,
-				fmt.Sprintf(` left join %s  %s on %s.%s = %s.%s `,
+				fmt.Sprintf(" left join %s  %s on %s.%s = %s.%s \n",
 					self.getTableName(field.ReferencedTable),
 					tableAlias,
 					tableAlias,
@@ -232,7 +232,7 @@ func (self *MSSQLLoader) find(t *Table, others ...map[string]interface{}) (selec
 	//intall groupby
 	if len(mq.GroupBy) > 0 {
 		//TODO to add field checker?
-		nonSelectClause = fmt.Sprintf(`%s GROUP BY %s`, nonSelectClause, strings.Join(mq.GroupBy, " ,"))
+		nonSelectClause = fmt.Sprintf("\n %s GROUP BY %s", nonSelectClause, strings.Join(mq.GroupBy, " ,"))
 	}
 	//TODO install group countby then replace the select
 
@@ -317,7 +317,9 @@ func (self *MSSQLLoader) replaceUnsafeFields(t *Table, sql string) string {
 
 //ORToUnion convert or query to union
 func (self *MSSQLLoader) ORToUnion(t *Table, sql string) string {
-	flag := `1!=1  OR`
+	unions := []string{}
+	or_list := []string{}
+	flag := ` OR `
 	if !strings.Contains(sql, flag) {
 		return sql
 	}
@@ -326,29 +328,56 @@ func (self *MSSQLLoader) ORToUnion(t *Table, sql string) string {
 	if len(sql_split_1) < 2 {
 		return sql
 	}
-	header := sql_split_1[0]
 
-	_or_list := strings.Split(sql_split_1[1], ")")
-
-	if len(_or_list) < 2 {
-		return sql //do nothing
+	for _, sp := range sql_split_1 {
+		fmt.Println(`SPLIT ===> `, sp)
 	}
 
-	tail := fmt.Sprintf(" ) %s", strings.Join(_or_list[1:], " ) ")) //adding back the right parenthesis
-	or_list := strings.Split(_or_list[0], " OR ")
-	unions := []string{}
+	_header := strings.Split(sql_split_1[0], "(")
+	if len(_header) == 0 {
+		return sql
+	}
+	header := fmt.Sprintf(" %s (", strings.Join(_header[0:len(_header)-1], "("))
+	firstOr := _header[len(_header)-1]
+	or_list = append(or_list, firstOr)
+
+	_tail := strings.Split(sql_split_1[len(sql_split_1)-1], ")")
+
+	if len(_tail) < 2 {
+		return sql
+	}
+
+	tail := fmt.Sprintf(" ) %s", strings.Join(_tail[1:], ")"))
+	lastOr := _tail[0]
+	or_list = append(or_list, lastOr)
+
+	fmt.Println(`LAST OR ======>`, lastOr)
+	fmt.Println(`HEADER ======>`, header)
+	fmt.Println(`TAIL ======>`, tail)
+
+	if len(sql_split_1) > 2 {
+
+		for _, or := range sql_split_1[1 : len(sql_split_1)-1] {
+			or_list = append(or_list, or)
+		}
+
+	}
 
 	for _, or := range or_list {
+		if strings.Contains(or, ` 1!=1 `) {
+			continue
+		}
+		fmt.Println(`OR =====>`, or)
 
-		unions = append(unions,
-
-			fmt.Sprintf(
-				"%s %s %s\n",
-				header, or, tail,
-			),
+		u := fmt.Sprintf(
+			"%s %s %s\n",
+			header, or, tail,
 		)
-
+		unions = append(unions, u)
+		fmt.Println(`UNION `, u)
 	}
+
+	fmt.Println(`SQL ====>`, sql)
 	return strings.Join(unions, " union \n")
 }
 
@@ -360,7 +389,7 @@ func (self *MSSQLLoader) FindQuery(t *Table, crit ...map[string]interface{}) (st
 		return "", err
 	}
 	//TODO safe guard selectedField with square brackets
-	ret := fmt.Sprintf(`SELECT %s %s`, strings.Join(selectedFields, ", "), nonSelectClause)
+	ret := fmt.Sprintf("SELECT %s %s  \n", strings.Join(selectedFields, ", "), nonSelectClause)
 	//TODO rewrite - convert OR to union query
 	ret = self.ORToUnion(t, ret)
 	//install orderby

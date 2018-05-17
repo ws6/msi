@@ -355,9 +355,14 @@ func (w *Where) ProtectedString() string {
 	cnn := ` 1=1 `
 	if w.LogicOperator == OR {
 		cnn = ` 1!=1 `
+		return fmt.Sprintf(
+			` AND ( %s %s   OR 1!=1 ) `, //helper for mssql union convertion
+			cnn,
+			strings.Join(ret, " "),
+		)
 	}
 	return fmt.Sprintf(
-		` AND ( %s %s  ) `,
+		` AND ( %s %s   ) `,
 		cnn,
 		strings.Join(ret, " "),
 	)
