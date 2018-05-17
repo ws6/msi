@@ -329,10 +329,6 @@ func (self *MSSQLLoader) ORToUnion(t *Table, sql string) string {
 		return sql
 	}
 
-	for _, sp := range sql_split_1 {
-		fmt.Println(`SPLIT ===> `, sp)
-	}
-
 	_header := strings.Split(sql_split_1[0], "(")
 	if len(_header) == 0 {
 		return sql
@@ -351,10 +347,6 @@ func (self *MSSQLLoader) ORToUnion(t *Table, sql string) string {
 	lastOr := _tail[0]
 	or_list = append(or_list, lastOr)
 
-	fmt.Println(`LAST OR ======>`, lastOr)
-	fmt.Println(`HEADER ======>`, header)
-	fmt.Println(`TAIL ======>`, tail)
-
 	if len(sql_split_1) > 2 {
 
 		for _, or := range sql_split_1[1 : len(sql_split_1)-1] {
@@ -367,17 +359,15 @@ func (self *MSSQLLoader) ORToUnion(t *Table, sql string) string {
 		if strings.Contains(or, ` 1!=1 `) {
 			continue
 		}
-		fmt.Println(`OR =====>`, or)
 
 		u := fmt.Sprintf(
 			"%s %s %s\n",
 			header, or, tail,
 		)
 		unions = append(unions, u)
-		fmt.Println(`UNION `, u)
+
 	}
 
-	fmt.Println(`SQL ====>`, sql)
 	return strings.Join(unions, " union \n")
 }
 
