@@ -315,6 +315,43 @@ func (self *MSSQLLoader) replaceUnsafeFields(t *Table, sql string) string {
 	return sql
 }
 
+//ORToUnion convert or query to union
+func (self *MSSQLLoader) ORToUnion(t *Table, sql string) string {
+	flag := `1!=1  OR`
+	if !strings.Contains(sql, flag) {
+		return sql
+	}
+
+	sql_split_1 := strings.Split(sql, flag)
+	if len(sql_split_1) < 2 {
+		return sql
+	}
+	header := sql_split_1[0]
+
+	_or_list := strings.Split(sql_split_1[1], ")")
+
+	if len(_or_list) < 2 {
+		return sql //do nothing
+	}
+
+	tail := fmt.Sprintf(" ) %s", strings.Join(_or_list[1:], " ) ")) //adding back the right parenthesis
+	or_list := strings.Split(_or_list[0], " OR ")
+	unions := []string{}
+
+	for _, or := range or_list {
+
+		unions = append(unions,
+
+			fmt.Sprintf(
+				"%s %s %s\n",
+				header, or, tail,
+			),
+		)
+
+	}
+	return strings.Join(unions, " union \n")
+}
+
 func (self *MSSQLLoader) FindQuery(t *Table, crit ...map[string]interface{}) (string, error) {
 
 	//!!!below is mysql dialect by default
@@ -324,7 +361,8 @@ func (self *MSSQLLoader) FindQuery(t *Table, crit ...map[string]interface{}) (st
 	}
 	//TODO safe guard selectedField with square brackets
 	ret := fmt.Sprintf(`SELECT %s %s`, strings.Join(selectedFields, ", "), nonSelectClause)
-
+	//TODO rewrite - convert OR to union query
+	ret = self.ORToUnion(t, ret)
 	//install orderby
 	if len(orderby) == 0 {
 		//!!!use first field instead of saying "id"
@@ -361,6 +399,10 @@ func (self *MSSQLLoader) CountQuery(t *Table, others ...map[string]interface{}) 
 	if err != nil {
 		return "", err
 	}
+	//	ret := fmt.Sprintf(`SELECT %s %s`, strings.Join(selectedFields, ", "), nonSelectClause)
+	//TODO rewrite - convert OR to union query
+	//	ret = self.ORToUnion(t, ret)
+
 	return fmt.Sprintf(`SELECT count(*) as count %s`, self.replaceUnsafeFields(t, nonSelectClause)), nil
 
 }
