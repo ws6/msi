@@ -599,7 +599,7 @@ func (t *Table) SafeWhere(crit map[string]interface{}) (string, error) {
 	}
 
 	whereClause := fmt.Sprintf(`WHERE 1=1  %s`, ToWhereString(wheres))
-	fmt.Println(whereClause)
+
 	return whereClause, nil
 
 }

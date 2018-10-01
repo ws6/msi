@@ -103,12 +103,19 @@ func (self *MSSQLLoader) DataType(colDataType string) string {
 		"decimal": "float64",
 		"double":  "float64",
 		"bit":     "uint64",
+		//		"numeric": "float64",
 	}
-	if fieldType, ok := kFieldTypes[strings.ToLower(colDataType)]; !ok {
+	fieldType, ok := kFieldTypes[strings.ToLower(colDataType)]
+	if !ok {
+		//		for k, v := range kFieldTypes {
+		//			if strings.HasPrefix(colDataType, k) {
+		//				return v
+		//			}
+		//		}
 		return "string"
-	} else {
-		return fieldType
 	}
+	return fieldType
+
 }
 func (self *MSSQLLoader) GetColumns(db *Msi) ([]map[string]interface{}, error) {
 	query := fmt.Sprintf(`SELECT

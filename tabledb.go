@@ -623,7 +623,8 @@ func (self *Table) Insert(_updates map[string]interface{}) error {
 	if self.Schema != nil && self.Schema.LifeCycle != nil {
 		for _, f := range self.Schema.LifeCycle.BeforeCreates {
 			if err := f(_updates); err != nil {
-				return err
+
+				return fmt.Errorf(`schema BeforeCreates err:%s`, err.Error())
 			}
 
 		}
@@ -632,7 +633,8 @@ func (self *Table) Insert(_updates map[string]interface{}) error {
 	if self.LifeCycle != nil {
 		for _, f := range self.LifeCycle.BeforeCreates {
 			if err := f(_updates); err != nil {
-				return err
+				return fmt.Errorf(`table BeforeCreates err:%s`, err.Error())
+
 			}
 
 		}
@@ -652,7 +654,7 @@ func (self *Table) Insert(_updates map[string]interface{}) error {
 	if self.Schema != nil && self.Schema.LifeCycle != nil {
 		for _, f := range self.Schema.LifeCycle.AfterCreates {
 			if err := f(_updates); err != nil {
-				return err
+				return fmt.Errorf(`schema AfterCreates err:%s`, err.Error())
 			}
 
 		}
@@ -661,7 +663,7 @@ func (self *Table) Insert(_updates map[string]interface{}) error {
 	if self.LifeCycle != nil {
 		for _, f := range self.LifeCycle.AfterCreates {
 			if err := f(_updates); err != nil {
-				return fmt.Errorf(`AfterCreates err:%s`, err.Error())
+				return fmt.Errorf(`table AfterCreates err:%s`, err.Error())
 			}
 
 		}
@@ -693,7 +695,7 @@ func (self *Table) Update(crit, updates map[string]interface{}) error {
 	if self.Schema != nil && self.Schema.LifeCycle != nil {
 		for _, f := range self.Schema.LifeCycle.BeforeUpdates {
 			if err := f(crit, updates); err != nil {
-				return err
+				return fmt.Errorf(`schema  BeforeUpdates err:%s`, err.Error())
 			}
 
 		}
@@ -702,7 +704,7 @@ func (self *Table) Update(crit, updates map[string]interface{}) error {
 	if self.LifeCycle != nil {
 		for _, f := range self.LifeCycle.BeforeUpdates {
 			if err := f(crit, updates); err != nil {
-				return err
+				return fmt.Errorf(`table  BeforeUpdates err:%s`, err.Error())
 			}
 
 		}
@@ -722,7 +724,7 @@ func (self *Table) Update(crit, updates map[string]interface{}) error {
 	if self.Schema != nil && self.Schema.LifeCycle != nil {
 		for _, f := range self.Schema.LifeCycle.AfterUpdates {
 			if err := f(crit, updates); err != nil {
-				return err
+				return fmt.Errorf(`schema  AfterUpdates err:%s`, err.Error())
 			}
 
 		}
@@ -731,7 +733,7 @@ func (self *Table) Update(crit, updates map[string]interface{}) error {
 	if self.LifeCycle != nil {
 		for _, f := range self.LifeCycle.AfterUpdates {
 			if err := f(crit, updates); err != nil {
-				return err
+				return fmt.Errorf(`table  AfterUpdates err:%s`, err.Error())
 			}
 
 		}
@@ -757,7 +759,8 @@ func (self *Table) Remove(crit map[string]interface{}) error {
 	if self.Schema != nil && self.Schema.LifeCycle != nil {
 		for _, f := range self.Schema.LifeCycle.BeforeRemoves {
 			if err := f(crit); err != nil {
-				return err
+
+				return fmt.Errorf(`Schema  BeforeRemoves err:%s`, err.Error())
 			}
 
 		}
@@ -766,7 +769,8 @@ func (self *Table) Remove(crit map[string]interface{}) error {
 	if self.LifeCycle != nil {
 		for _, f := range self.LifeCycle.BeforeRemoves {
 			if err := f(crit); err != nil {
-				return err
+
+				return fmt.Errorf(`table  BeforeRemoves err:%s`, err.Error())
 			}
 
 		}
@@ -786,7 +790,8 @@ func (self *Table) Remove(crit map[string]interface{}) error {
 	if self.Schema != nil && self.Schema.LifeCycle != nil {
 		for _, f := range self.Schema.LifeCycle.AfterRemoves {
 			if err := f(crit); err != nil {
-				return err
+
+				return fmt.Errorf(`Schema  AfterRemoves err:%s`, err.Error())
 			}
 
 		}
@@ -795,7 +800,7 @@ func (self *Table) Remove(crit map[string]interface{}) error {
 	if self.LifeCycle != nil {
 		for _, f := range self.LifeCycle.AfterRemoves {
 			if err := f(crit); err != nil {
-				return err
+				return fmt.Errorf(`table   AfterRemoves err:%s`, err.Error())
 			}
 
 		}
