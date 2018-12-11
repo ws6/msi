@@ -1,10 +1,15 @@
 package msi
 
+import (
+	"strings"
+)
+
 var NO_ESCAPE = false
 
 func Escape(sql string) string {
 	if NO_ESCAPE {
 		return sql
+		return strings.Replace(sql, "'", "''", -1)
 	}
 	dest := make([]byte, 0, 2*len(sql))
 	var escape byte

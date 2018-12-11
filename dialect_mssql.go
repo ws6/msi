@@ -50,7 +50,7 @@ func (o *SinceField) SelectFieldName() string {
 	return fmt.Sprintf(` DATEDIFF(%s, %s, getdate()) as %s  `, o.By, o.FieldName, o.AsName())
 }
 func (o *SinceField) AsName() string {
-	return fmt.Sprintf(`%s_since_%s`, o.By, o.FieldName)
+	return fmt.Sprintf(`[%s_since_%s]`, o.By, o.FieldName)
 }
 
 func NewSinceField(f string) *SinceField {
