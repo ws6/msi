@@ -179,7 +179,7 @@ func (self *MSSQLLoader) find(t *Table, others ...map[string]interface{}) (selec
 			//			tableAlias := fmt.Sprintf("%s__%s", field.ReferencedTable.TableName, field.Name)
 			tableAlias := field.GetTableAlias()
 			leftjoins = append(leftjoins,
-				fmt.Sprintf(" left join %s  %s on %s.%s = %s.%s \n",
+				fmt.Sprintf(" left join %s  [%s] on %s.[%s] = [%s].[%s] \n",
 					self.getTableName(field.ReferencedTable),
 					tableAlias,
 					tableAlias,
