@@ -89,6 +89,28 @@ func NewSinceField(f string) *SinceField {
 //	return fmt.Sprintf(` DATEDIFF(%s, %s, getdate()) as %s_since_%s  `, by, fieldName, by, fieldName)
 //}
 
+func IsAggField(s string) bool {
+	startsWith := []string{
+		`sum`,
+		`avg`,
+		`count`,
+		`min`,
+		`max`,
+		`stdev`,
+		`stdevp`,
+		`var`,
+		`varp`,
+		`count_big`,
+		`approx_count_distinct`,
+	}
+	for _, v := range startsWith {
+		if strings.HasPrefix(strings.ToLower(s), v+"(") {
+			return true
+		}
+	}
+	return false
+}
+
 func (self *MSSQLLoader) find(t *Table, others ...map[string]interface{}) (selectedFields []string, nonSelectClause string, orderby []string, limit int, offset int, err error) {
 	for _, field := range t.Fields {
 		if field.Selected {
@@ -243,12 +265,20 @@ func (self *MSSQLLoader) find(t *Table, others ...map[string]interface{}) (selec
 		}
 
 		selectedFields = []string{} //clean out previous
+		groupByFields := []string{}
+		//TODO check if any sum/avg fucntion needed
+
 		for _, f := range mq.GroupCountBy {
 
 			selectedFields = append(selectedFields, f)
+			if IsAggField(f) {
+				continue
+			}
+			groupByFields = append(groupByFields, f)
+
 		}
 		selectedFields = append(selectedFields, `count(*) as count`)
-		nonSelectClause = fmt.Sprintf(`%s GROUP BY %s`, nonSelectClause, strings.Join(mq.GroupCountBy, " ,"))
+		nonSelectClause = fmt.Sprintf(`%s GROUP BY %s`, nonSelectClause, strings.Join(groupByFields, " ,"))
 
 	}
 	if len(mq.SinceCountby) > 0 {
