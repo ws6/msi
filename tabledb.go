@@ -1,6 +1,7 @@
 package msi
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -217,6 +218,64 @@ func (self *Table) Find(others ...map[string]interface{}) *Stmt {
 	return ret
 }
 
+func (s *Stmt) CtxChan(ctx context.Context, limit int) chan map[string]interface{} {
+	ret := make(chan map[string]interface{}, limit*3) //!!! three times bigger than limit
+
+	metaQuery := map[string]interface{}{
+		LIMIT: limit, OFFSET: 0,
+	}
+	if len(s.others) == 0 {
+		s.others = append(s.others, nil)
+	}
+
+	if len(s.others) == 1 {
+		s.others = append(s.others, metaQuery)
+	}
+
+	if _, ok := s.others[1][LIMIT]; !ok {
+		s.others[1][LIMIT] = limit
+	}
+	if _, ok := s.others[1][OFFSET]; !ok {
+		s.others[1][OFFSET] = 0
+	}
+
+	go func() {
+		offset, ok := s.others[1][OFFSET].(int)
+		if !ok {
+			offset = 0
+		}
+		defer close(ret)
+
+		for {
+			results, err := s.Map()
+			offset += limit
+			s.others[1][OFFSET] = offset
+
+			if err != nil {
+				if DEBUG {
+					log.Println(err.Error())
+				}
+				break
+			}
+
+			if len(results) == 0 {
+				break
+			}
+
+			for _, result := range results {
+				select {
+				case ret <- result:
+					continue
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
+
+	}()
+
+	return ret
+}
 func (s *Stmt) ClosableChan(limit int, done <-chan bool) chan map[string]interface{} {
 	ret := make(chan map[string]interface{}, limit*3) //!!! three times bigger than limit
 
