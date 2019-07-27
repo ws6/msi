@@ -2,9 +2,11 @@ package msi
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 func init() {
@@ -480,11 +482,76 @@ func (self *MSSQLLoader) MakeInsertFields(t *Table, updates []*NameVal) []string
 	return ret
 }
 
+func (self *MSSQLLoader) Escape(sql string) string {
+
+	return strings.Replace(Escape(sql), "'", "''", -1)
+
+}
+
+func (self *MSSQLLoader) InterfaceToString(i interface{}) string {
+
+	if i == nil {
+		return `null` //!!! mysql dialect
+	}
+	if s, ok := i.(string); ok {
+		return fmt.Sprintf("'%s'", self.Escape(s))
+	}
+	if s, ok := i.(bool); ok {
+		if s {
+			return `true`
+		}
+		return `false`
+	}
+
+	if s, ok := i.(int); ok {
+		return fmt.Sprintf(`%d`, s)
+	}
+	if s, ok := i.(int64); ok {
+		return fmt.Sprintf(`%d`, s)
+	}
+
+	if s, ok := i.(float32); ok {
+		return fmt.Sprintf(`%f`, s)
+	}
+	if s, ok := i.(float64); ok {
+		return fmt.Sprintf(`%f`, s)
+	}
+	sqlTimeFormatter := "'%04d-%02d-%02d %02d:%02d:%02d'"
+	if s, ok := i.(time.Time); ok {
+		return fmt.Sprintf(sqlTimeFormatter, s.Year(), s.Month(), s.Day(), s.Hour(), s.Minute(), s.Second()) //TODO to be better formatted
+	}
+
+	if tPtr, ok := i.(*time.Time); ok {
+
+		if tPtr != nil {
+			s := *tPtr
+			return fmt.Sprintf(sqlTimeFormatter, s.Year(), s.Month(), s.Day(), s.Hour(), s.Minute(), s.Second()) //TODO to be better formatted
+		}
+
+	}
+
+	if DEBUG {
+		log.Println(`can not figure out type of interface `, i)
+	}
+	return ""
+}
+
+func (self *MSSQLLoader) Stringify(updates map[string]interface{}) map[string]string {
+	ret := make(map[string]string)
+
+	for k, v := range updates {
+		ret[k] = self.InterfaceToString(v)
+	}
+
+	return ret
+
+}
+
 func (self *MSSQLLoader) insertQuery(t *Table, _updates map[string]interface{}) (string, error) {
 
 	updates := []*NameVal{}
 
-	for k, v := range Stringify(_updates) {
+	for k, v := range self.Stringify(_updates) {
 
 		if t.GetMyField(k) == nil {
 			continue //remove non-table defined fields

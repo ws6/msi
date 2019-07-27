@@ -33,6 +33,7 @@ func Escape(sql string) string {
 			break
 		case '\'':
 			escape = '\''
+			
 			break
 		case '"': /* Better safe than sorry */
 			escape = '"'
