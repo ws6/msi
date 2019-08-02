@@ -484,7 +484,7 @@ func (self *MSSQLLoader) MakeInsertFields(t *Table, updates []*NameVal) []string
 
 func (self *MSSQLLoader) Escape(sql string) string {
 
-	return strings.Replace(Escape(sql), "'", "''", -1)
+	return strings.Replace(sql, "'", "''", -1)
 
 }
 
@@ -622,7 +622,7 @@ func (self *MSSQLLoader) SafeWhere(t *Table, crit map[string]interface{}) (strin
 
 func (self *MSSQLLoader) SafeUpdate(t *Table, updates map[string]interface{}) []string {
 	up := []string{}
-	for k, v := range Stringify(updates) {
+	for k, v := range self.Stringify(updates) {
 		field := t.GetField(k)
 		if field == nil {
 			continue
