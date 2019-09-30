@@ -2,6 +2,7 @@ package msi
 
 import (
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/mijia/modelq/drivers"
@@ -289,6 +290,7 @@ rc.name as reference_column_name ,
 	for _, fk := range foreignKeys {
 		tableName, err := ToString(fk[`table_name`])
 		if err != nil {
+
 			return err
 		}
 		colName, err := ToString(fk[`column_name`])
@@ -306,6 +308,8 @@ rc.name as reference_column_name ,
 
 		table := db.GetTable(tableName)
 		if table == nil {
+			log.Print(`Install Foreign Key err: failed get table`, tableName, `skip`)
+			continue
 			return fmt.Errorf(`no table found [%s]`, tableName)
 		}
 		col := table.GetField(colName)
