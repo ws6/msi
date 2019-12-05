@@ -5,6 +5,10 @@ import (
 	"fmt"
 )
 
+const (
+	DEFAULT_TIMEOUT_SECONDS = 60 * 5
+)
+
 var (
 	DEBUG     = false
 	USE_LOCAL = true //parser time into Local instead of UTC
@@ -51,6 +55,7 @@ type Msi struct {
 	DatabaseName      string //database name or schema in postgres
 	tableNames        string
 	ForeignKeyTypeMap map[string]string
+	TimeoutSeconds    int //timeout map query
 }
 
 func (self *Msi) GetTable(tableName string) *Table {
@@ -87,6 +92,7 @@ func (self *Msi) ReOpen() error {
 //NewDb(`mysql`, `rw_sage:Exxxc0ndid0@(ussd-prd-mysq01:3306)/sage`, `sage`,``)
 func NewDb(driver, dsnString, schema, tableNames string) (*Msi, error) {
 	ret := new(Msi)
+	ret.TimeoutSeconds = DEFAULT_TIMEOUT_SECONDS
 	ret.LifeCycle = new(LifeCycle)
 	ret.DriverName = driver
 	ret.DsnString = dsnString

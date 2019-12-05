@@ -889,7 +889,7 @@ func (self *Msi) installForeignKeyMap() {
 	}
 }
 
-func (self *Msi) Map(db *sql.DB, query string, typeMap map[string]string) ([]map[string]interface{}, error) {
+func (self *Msi) Map(db *sql.DB, query string, typeMap map[string]string, ctxs ...context.Context) ([]map[string]interface{}, error) {
 	if DEBUG {
 		fmt.Println(query)
 	}
@@ -899,7 +899,16 @@ func (self *Msi) Map(db *sql.DB, query string, typeMap map[string]string) ([]map
 	if len(self.ForeignKeyTypeMap) == 0 && len(self.Tables) > 0 {
 		self.installForeignKeyMap()
 	}
-	rows, err := db.Query(query)
+	ctx := context.Background()
+	if len(ctxs) > 0 {
+		ctx = ctxs[0]
+	}
+	if len(ctxs) == 0 {
+		_ctx, cancelFn := context.WithTimeout(ctx, time.Duration(self.TimeoutSeconds)*time.Second)
+		defer cancelFn()
+		ctx = _ctx
+	}
+	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
