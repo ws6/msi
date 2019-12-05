@@ -26,6 +26,12 @@ type Stmt struct {
 	total  int
 	others []map[string]interface{}
 	table  *Table
+	_ctx   context.Context
+}
+
+func (self *Stmt) Context(ctx context.Context) *Stmt {
+	self._ctx = ctx
+	return self
 }
 
 //Page one page of results with Total count information
@@ -65,8 +71,10 @@ func (self *Table) GetGroupCountPageCount(others ...map[string]interface{}) (int
 	if self.Schema == nil {
 		return 0, fmt.Errorf(`no schema pointer found from table[%s]`, self.TableName)
 	}
-	rows, err := self.Schema.Db.Query(countQuery)
-	fmt.Println(`rawQuery`, rawQuery)
+	ctx, cancelFn := self.Schema.NewCtx()
+	defer cancelFn()
+	rows, err := self.Schema.Db.QueryContext(ctx, countQuery)
+
 	if err != nil {
 
 		return 0, fmt.Errorf(`countQuery err:%s`, err.Error())
@@ -369,6 +377,7 @@ func (s *Stmt) Chan(limit int) chan map[string]interface{} {
 			s.others[1][OFFSET] = offset
 
 			if err != nil {
+				fmt.Println(`Chan err:`, err.Error())
 				if DEBUG {
 					log.Println(err.Error())
 				}
@@ -390,6 +399,13 @@ func (s *Stmt) Chan(limit int) chan map[string]interface{} {
 }
 
 func (s *Stmt) Count() (int, error) {
+	ctx, cancelFn := s.table.Schema.NewCtx()
+	defer cancelFn()
+
+	return s.CountContext(ctx)
+}
+
+func (s *Stmt) CountContext(ctx context.Context) (int, error) {
 	if s.err != nil {
 		return 0, s.err
 	}
@@ -401,7 +417,8 @@ func (s *Stmt) Count() (int, error) {
 	if DEBUG {
 		log.Println(query)
 	}
-	rows, err := s.Db.Query(query)
+
+	rows, err := s.Db.QueryContext(ctx, query)
 
 	if err != nil {
 		return 0, err
@@ -611,6 +628,15 @@ func ParseVal(_type string, v interface{}) interface{} {
 //Map https://github.com/jmoiron/sqlx/blob/master/sqlx.go#L820
 
 func (s *Stmt) Map(moreTypeMap ...map[string]string) ([]map[string]interface{}, error) {
+	ctx := context.Background()
+
+	if s._ctx != nil {
+		ctx = s._ctx
+	}
+	return s.MapContext(ctx, moreTypeMap...)
+}
+
+func (s *Stmt) MapContext(ctx context.Context, moreTypeMap ...map[string]string) ([]map[string]interface{}, error) {
 	//TODO allow interfaced
 	if s.table == nil || s.table.Schema == nil {
 		return nil, fmt.Errorf(`no table or db installed`)
@@ -635,7 +661,7 @@ func (s *Stmt) Map(moreTypeMap ...map[string]string) ([]map[string]interface{}, 
 		}
 	}
 
-	ret, err := s.table.Schema.Map(s.Db, query, typemap)
+	ret, err := s.table.Schema.Map(s.Db, query, typemap, ctx)
 
 	if err != nil {
 		return nil, err
@@ -664,7 +690,7 @@ func (s *Stmt) Map(moreTypeMap ...map[string]string) ([]map[string]interface{}, 
 	return ret, nil
 }
 
-func (self *Table) insert(_updates map[string]interface{}) error {
+func (self *Table) insert(ctx context.Context, _updates map[string]interface{}) error {
 
 	query, err := self.InsertQuery(_updates)
 	if err != nil {
@@ -673,12 +699,12 @@ func (self *Table) insert(_updates map[string]interface{}) error {
 	if DEBUG {
 		log.Println(query)
 	}
-	_, err = self.Schema.Db.Exec(query)
+	// ctx, cancelFn := self.Schema.NewCtx()
+	// defer cancelFn()
+	_, err = self.Schema.Db.ExecContext(ctx, query)
 	return err
 }
-
-func (self *Table) Insert(_updates map[string]interface{}) error {
-
+func (self *Table) InsertContext(ctx context.Context, _updates map[string]interface{}) error {
 	if self.Schema != nil && self.Schema.LifeCycle != nil {
 		for _, f := range self.Schema.LifeCycle.BeforeCreates {
 			if err := f(_updates); err != nil {
@@ -699,14 +725,7 @@ func (self *Table) Insert(_updates map[string]interface{}) error {
 		}
 	}
 
-	//	dl, ok := self.Schema.loader.(Dialect)
-	//	if ok {
-	//		if err := dl.Insert(self, _updates); err != nil {
-	//			return err
-	//		}
-	//	}
-
-	if err := self.insert(_updates); err != nil {
+	if err := self.insert(ctx, _updates); err != nil {
 		return err
 	}
 
@@ -729,10 +748,14 @@ func (self *Table) Insert(_updates map[string]interface{}) error {
 	}
 
 	return nil
-
+}
+func (self *Table) Insert(_updates map[string]interface{}) error {
+	ctx, cancelFn := self.Schema.NewCtx()
+	defer cancelFn()
+	return self.InsertContext(ctx, _updates)
 }
 
-func (self *Table) update(crit, updates map[string]interface{}) error {
+func (self *Table) update(ctx context.Context, crit, updates map[string]interface{}) error {
 	query, err := self.UpdateQuery(crit, updates)
 	if err != nil {
 		return err
@@ -740,7 +763,7 @@ func (self *Table) update(crit, updates map[string]interface{}) error {
 	if DEBUG {
 		log.Println(query)
 	}
-	_, err = self.Schema.Db.Exec(query)
+	_, err = self.Schema.Db.ExecContext(ctx, query)
 
 	if err != nil {
 		return fmt.Errorf(`update query err: %s  ;query %s`, query, err.Error())
@@ -750,6 +773,12 @@ func (self *Table) update(crit, updates map[string]interface{}) error {
 }
 
 func (self *Table) Update(crit, updates map[string]interface{}) error {
+	ctx, cancelFn := self.Schema.NewCtx()
+	defer cancelFn()
+	return self.UpdateContext(ctx, crit, updates)
+}
+
+func (self *Table) UpdateContext(ctx context.Context, crit, updates map[string]interface{}) error {
 
 	if self.Schema != nil && self.Schema.LifeCycle != nil {
 		for _, f := range self.Schema.LifeCycle.BeforeUpdates {
@@ -776,7 +805,7 @@ func (self *Table) Update(crit, updates map[string]interface{}) error {
 	//		}
 	//	}
 
-	if err := self.update(crit, updates); err != nil {
+	if err := self.update(ctx, crit, updates); err != nil {
 		return err
 	}
 
@@ -801,7 +830,7 @@ func (self *Table) Update(crit, updates map[string]interface{}) error {
 	return nil
 }
 
-func (self *Table) remove(crit map[string]interface{}) error {
+func (self *Table) remove(ctx context.Context, crit map[string]interface{}) error {
 	query, err := self.RemoveQuery(crit)
 	if err != nil {
 		return err
@@ -809,11 +838,19 @@ func (self *Table) remove(crit map[string]interface{}) error {
 	if DEBUG {
 		log.Println(query)
 	}
-	_, err = self.Schema.Db.Exec(query)
+	// ctx, cancelFn := self.Schema.NewCtx()
+	// defer cancelFn()
+	_, err = self.Schema.Db.ExecContext(ctx, query)
 	return err
 }
 
 func (self *Table) Remove(crit map[string]interface{}) error {
+	ctx, cancelFn := self.Schema.NewCtx()
+	defer cancelFn()
+	return self.RemoveContext(ctx, crit)
+}
+
+func (self *Table) RemoveContext(ctx context.Context, crit map[string]interface{}) error {
 
 	if self.Schema != nil && self.Schema.LifeCycle != nil {
 		for _, f := range self.Schema.LifeCycle.BeforeRemoves {
@@ -842,7 +879,7 @@ func (self *Table) Remove(crit map[string]interface{}) error {
 	//		}
 	//	}
 
-	if err := self.remove(crit); err != nil {
+	if err := self.remove(ctx, crit); err != nil {
 		return err
 	}
 
@@ -890,7 +927,7 @@ func (self *Msi) installForeignKeyMap() {
 }
 
 func (self *Msi) Map(db *sql.DB, query string, typeMap map[string]string, ctxs ...context.Context) ([]map[string]interface{}, error) {
-	if DEBUG {
+	if DEBUG || self.Debug {
 		fmt.Println(query)
 	}
 	if self.ForeignKeyTypeMap == nil {
@@ -904,7 +941,7 @@ func (self *Msi) Map(db *sql.DB, query string, typeMap map[string]string, ctxs .
 		ctx = ctxs[0]
 	}
 	if len(ctxs) == 0 {
-		_ctx, cancelFn := context.WithTimeout(ctx, time.Duration(self.TimeoutSeconds)*time.Second)
+		_ctx, cancelFn := self.NewCtx()
 		defer cancelFn()
 		ctx = _ctx
 	}
@@ -953,7 +990,7 @@ func (self *Msi) Map(db *sql.DB, query string, typeMap map[string]string, ctxs .
 		return nil, rows.Err()
 	}
 
-	return ret, nil
+	return ret, ctx.Err()
 }
 
 func (t *Table) FindOne(crit ...map[string]interface{}) (M, error) {

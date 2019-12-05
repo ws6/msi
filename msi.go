@@ -1,8 +1,10 @@
 package msi
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
+	"time"
 )
 
 const (
@@ -56,6 +58,7 @@ type Msi struct {
 	tableNames        string
 	ForeignKeyTypeMap map[string]string
 	TimeoutSeconds    int //timeout map query
+	Debug             bool
 }
 
 func (self *Msi) GetTable(tableName string) *Table {
@@ -176,4 +179,9 @@ func getFieldFromInterface(table *Table, _col interface{}) (*Field, error) {
 
 	return field, nil
 
+}
+
+func (self *Msi) NewCtx() (context.Context, func()) {
+	ctx := context.Background()
+	return context.WithTimeout(ctx, time.Duration(self.TimeoutSeconds)*time.Second)
 }
