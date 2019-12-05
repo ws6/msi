@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+
 	"time"
 )
 
@@ -91,6 +92,18 @@ func (self *Msi) ReOpen() error {
 	return nil
 }
 
+var RegisterMsi, GetAllMsi = func() (func(*Msi), func() []*Msi) {
+
+	cache := []*Msi{}
+	return func(m *Msi) {
+
+			cache = append(cache, m)
+		},
+		func() []*Msi {
+			return cache
+		}
+}()
+
 //NewDb loading all tables field definitions from database
 //NewDb(`mysql`, `rw_sage:Exxxc0ndid0@(ussd-prd-mysq01:3306)/sage`, `sage`,``)
 func NewDb(driver, dsnString, schema, tableNames string) (*Msi, error) {
@@ -103,6 +116,7 @@ func NewDb(driver, dsnString, schema, tableNames string) (*Msi, error) {
 	ret.tableNames = tableNames
 	ret.DatabaseName = schema
 	var err error
+
 	ret.Db, err = sql.Open(ret.DriverName, ret.DsnString)
 
 	if err != nil {
@@ -121,7 +135,7 @@ func NewDb(driver, dsnString, schema, tableNames string) (*Msi, error) {
 	if err := loader.LoadForeignKeys(ret); err != nil {
 		return nil, err
 	}
-
+	RegisterMsi(ret)
 	return ret, nil
 }
 
