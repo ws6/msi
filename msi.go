@@ -122,6 +122,7 @@ func NewDb(driver, dsnString, schema, tableNames string) (*Msi, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	loader, ok := Loaders[driver]
 	if !ok {
 		return nil, fmt.Errorf(`no loader defined for driver [%s]`, driver)

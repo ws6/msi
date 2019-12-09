@@ -633,6 +633,13 @@ func (s *Stmt) Map(moreTypeMap ...map[string]string) ([]map[string]interface{}, 
 	if s._ctx != nil {
 		ctx = s._ctx
 	}
+	if ctx == nil {
+		if s.table != nil && s.table.Schema != nil {
+			_ctx, cancalFn := s.table.Schema.NewCtx()
+			defer cancalFn()
+			ctx = _ctx
+		}
+	}
 	return s.MapContext(ctx, moreTypeMap...)
 }
 
@@ -661,7 +668,7 @@ func (s *Stmt) MapContext(ctx context.Context, moreTypeMap ...map[string]string)
 		}
 	}
 
-	ret, err := s.table.Schema.Map(s.Db, query, typemap, ctx)
+	ret, err := s.table.Schema.MapContext(ctx, s.Db, query, typemap)
 
 	if err != nil {
 		return nil, err
@@ -925,8 +932,7 @@ func (self *Msi) installForeignKeyMap() {
 		}
 	}
 }
-
-func (self *Msi) Map(db *sql.DB, query string, typeMap map[string]string, ctxs ...context.Context) ([]map[string]interface{}, error) {
+func (self *Msi) MapContext(ctx context.Context, db *sql.DB, query string, typeMap map[string]string, ctxs ...context.Context) ([]map[string]interface{}, error) {
 	if DEBUG || self.Debug {
 		fmt.Println(query)
 	}
@@ -936,15 +942,7 @@ func (self *Msi) Map(db *sql.DB, query string, typeMap map[string]string, ctxs .
 	if len(self.ForeignKeyTypeMap) == 0 && len(self.Tables) > 0 {
 		self.installForeignKeyMap()
 	}
-	ctx := context.Background()
-	if len(ctxs) > 0 {
-		ctx = ctxs[0]
-	}
-	if len(ctxs) == 0 {
-		_ctx, cancelFn := self.NewCtx()
-		defer cancelFn()
-		ctx = _ctx
-	}
+
 	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
@@ -991,6 +989,23 @@ func (self *Msi) Map(db *sql.DB, query string, typeMap map[string]string, ctxs .
 	}
 
 	return ret, ctx.Err()
+
+}
+
+func (self *Msi) Map(db *sql.DB, query string, typeMap map[string]string, ctxs ...context.Context) ([]map[string]interface{}, error) {
+
+	ctx := context.Background()
+	if len(ctxs) > 0 {
+		ctx = ctxs[0]
+	}
+	if len(ctxs) == 0 {
+		_ctx, cancelFn := self.NewCtx()
+		defer cancelFn()
+		ctx = _ctx
+	}
+
+	return self.MapContext(ctx, db, query, typeMap)
+
 }
 
 func (t *Table) FindOne(crit ...map[string]interface{}) (M, error) {
