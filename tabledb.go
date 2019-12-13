@@ -27,6 +27,7 @@ type Stmt struct {
 	others []map[string]interface{}
 	table  *Table
 	_ctx   context.Context
+	debug  bool
 }
 
 func (self *Stmt) Context(ctx context.Context) *Stmt {
@@ -227,6 +228,7 @@ func (self *Table) Find(others ...map[string]interface{}) *Stmt {
 }
 
 func (s *Stmt) CtxChan(ctx context.Context, limit int) chan map[string]interface{} {
+
 	ret := make(chan map[string]interface{}, limit*3) //!!! three times bigger than limit
 
 	metaQuery := map[string]interface{}{
@@ -255,7 +257,7 @@ func (s *Stmt) CtxChan(ctx context.Context, limit int) chan map[string]interface
 		defer close(ret)
 
 		for {
-			results, err := s.Map()
+			results, err := s.MapContext(ctx)
 			offset += limit
 			s.others[1][OFFSET] = offset
 
