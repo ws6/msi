@@ -277,6 +277,7 @@ func (s *Stmt) CtxChan(ctx context.Context, limit int) chan map[string]interface
 				case ret <- result:
 					continue
 				case <-ctx.Done():
+					fmt.Println(`CtxChan Closed`)
 					return
 				}
 			}
@@ -346,6 +347,9 @@ func (s *Stmt) ClosableChan(limit int, done <-chan bool) chan map[string]interfa
 }
 
 func (s *Stmt) Chan(limit int) chan map[string]interface{} {
+	if s._ctx != nil {
+		return s.CtxChan(s._ctx, limit)
+	}
 	ret := make(chan map[string]interface{}, limit*3) //!!! three times bigger than limit
 
 	metaQuery := map[string]interface{}{
@@ -969,6 +973,7 @@ func (self *Msi) MapContext(ctx context.Context, db *sql.DB, query string, typeM
 		dest := make(map[string]interface{})
 		for i, column := range columns {
 			dest[column] = *(values[i].(*interface{}))
+
 			_type := `string`
 
 			if __type, ok := typeMap[column]; ok {
