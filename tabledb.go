@@ -962,6 +962,12 @@ func (self *Msi) MapContext(ctx context.Context, db *sql.DB, query string, typeM
 
 	ret := []map[string]interface{}{}
 	for rows.Next() {
+		select {
+		case <-ctx.Done():
+			return ret, ctx.Err()
+		default:
+
+		}
 		values := make([]interface{}, len(columns))
 		for i := range values {
 			values[i] = new(interface{})
