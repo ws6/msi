@@ -347,61 +347,16 @@ func (s *Stmt) ClosableChan(limit int, done <-chan bool) chan map[string]interfa
 }
 
 func (s *Stmt) Chan(limit int) chan map[string]interface{} {
-	if s._ctx != nil {
-		return s.CtxChan(s._ctx, limit)
-	}
-	ret := make(chan map[string]interface{}, limit*3) //!!! three times bigger than limit
-
-	metaQuery := map[string]interface{}{
-		LIMIT: limit, OFFSET: 0,
-	}
-	if len(s.others) == 0 {
-		s.others = append(s.others, nil)
+	ctx := s._ctx
+	if ctx == nil {
+		fmt.Println(`no default Context passed in`)
+		_ctx, _cancelFn := s.table.Schema.NewCtx()
+		defer _cancelFn()
+		ctx = _ctx
 	}
 
-	if len(s.others) == 1 {
-		s.others = append(s.others, metaQuery)
-	}
+	return s.CtxChan(ctx, limit)
 
-	if _, ok := s.others[1][LIMIT]; !ok {
-		s.others[1][LIMIT] = limit
-	}
-	if _, ok := s.others[1][OFFSET]; !ok {
-		s.others[1][OFFSET] = 0
-	}
-
-	go func() {
-		offset, ok := s.others[1][OFFSET].(int)
-		if !ok {
-			offset = 0
-		}
-		defer close(ret)
-
-		for {
-			results, err := s.Map()
-			offset += limit
-			s.others[1][OFFSET] = offset
-
-			if err != nil {
-				fmt.Println(`Chan err:`, err.Error())
-				if DEBUG {
-					log.Println(err.Error())
-				}
-				break
-			}
-
-			if len(results) == 0 {
-				break
-			}
-
-			for _, result := range results {
-				ret <- result
-			}
-		}
-
-	}()
-
-	return ret
 }
 
 func (s *Stmt) Count() (int, error) {
