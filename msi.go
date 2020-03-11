@@ -198,5 +198,5 @@ func getFieldFromInterface(table *Table, _col interface{}) (*Field, error) {
 
 func (self *Msi) NewCtx() (context.Context, func()) {
 	ctx := context.Background()
-	return context.WithTimeout(ctx, time.Duration(self.TimeoutSeconds)*time.Second)
+	return context.WithTimeout(ctx, time.Duration(self.TimeoutSeconds+120)*time.Second)
 }

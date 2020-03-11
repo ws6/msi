@@ -250,11 +250,15 @@ func (s *Stmt) CtxChan(ctx context.Context, limit int) chan map[string]interface
 	}
 
 	go func() {
+
+		defer fmt.Println(`CtxChan Closed`)
+
+		defer close(ret)
+
 		offset, ok := s.others[1][OFFSET].(int)
 		if !ok {
 			offset = 0
 		}
-		defer close(ret)
 
 		for {
 			results, err := s.MapContext(ctx)
@@ -262,14 +266,14 @@ func (s *Stmt) CtxChan(ctx context.Context, limit int) chan map[string]interface
 			s.others[1][OFFSET] = offset
 
 			if err != nil {
-				if DEBUG {
-					log.Println(err.Error())
+				if DEBUG || true {
+					log.Println(`CtxChan err:`, err.Error())
 				}
-				break
+				return
 			}
 
 			if len(results) == 0 {
-				break
+				return
 			}
 
 			for _, result := range results {
@@ -596,7 +600,7 @@ func (s *Stmt) Map(moreTypeMap ...map[string]string) ([]map[string]interface{}, 
 	}
 	if ctx == nil {
 		if s.table != nil && s.table.Schema != nil {
-			_ctx, cancalFn := s.table.Schema.NewCtx()
+			_ctx, cancalFn := context.WithTimeout(context.Background(), 120*time.Second)
 			defer cancalFn()
 			ctx = _ctx
 		}
@@ -906,6 +910,7 @@ func (self *Msi) MapContext(ctx context.Context, db *sql.DB, query string, typeM
 
 	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
+		fmt.Println(`err in  QueryContext`, err.Error())
 		return nil, err
 	}
 
@@ -919,6 +924,7 @@ func (self *Msi) MapContext(ctx context.Context, db *sql.DB, query string, typeM
 	for rows.Next() {
 		select {
 		case <-ctx.Done():
+			fmt.Println(`canceled when rows.Next`)
 			return ret, ctx.Err()
 		default:
 

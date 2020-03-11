@@ -82,7 +82,7 @@ rc.name as reference_column_name ,
 func (self *MSSQLLoader) DataType(colDataType string) string {
 
 	kFieldTypes := map[string]string{
-		"text":      "int64",
+		"text":      "string",
 		"date":      "time.Time",
 		"datetime":  "time.Time",
 		"datetime2": "time.Time",
@@ -165,9 +165,10 @@ func (self *MSSQLLoader) SetVersion(db *Msi) error {
 }
 
 func (self *MSSQLLoader) LoadDatabaseSchema(db *Msi) error {
-	if err := self.SetVersion(db); err != nil {
-		return err
-	}
+
+	// if err := self.SetVersion(db); err != nil {
+	// 	return err
+	// }
 
 	columns, err := self.GetColumns(db)
 	if err != nil {
@@ -175,6 +176,7 @@ func (self *MSSQLLoader) LoadDatabaseSchema(db *Msi) error {
 	}
 
 	getTableColumns := func(tableName string, table *Table) ([]*Field, error) {
+
 		ret := []*Field{}
 		for _, col := range columns {
 			_tableName, err := ToString(col[`table_name`])
