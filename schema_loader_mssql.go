@@ -82,7 +82,7 @@ rc.name as reference_column_name ,
 func (self *MSSQLLoader) DataType(colDataType string) string {
 
 	kFieldTypes := map[string]string{
-		"text":      "string",
+		"text":      "[]byte",
 		"date":      "time.Time",
 		"datetime":  "time.Time",
 		"datetime2": "time.Time",
