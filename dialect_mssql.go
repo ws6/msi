@@ -614,7 +614,7 @@ func (self *MSSQLLoader) SafeWhere(t *Table, crit map[string]interface{}) (strin
 		}
 	}
 
-	whereClause := fmt.Sprintf(`WHERE 1=1  %s`, ToWhereString(wheres))
+	whereClause := fmt.Sprintf(`WHERE 1=1  %s`, ToWhereString(t, wheres))
 
 	return whereClause, nil
 

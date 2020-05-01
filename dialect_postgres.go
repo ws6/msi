@@ -257,7 +257,7 @@ func (self *PostgresLoader) CountQuery(t *Table, others ...map[string]interface{
 func (self *PostgresLoader) InsertQuery(t *Table, _updates map[string]interface{}) (string, error) {
 
 	updates := []*NameVal{}
-	for k, v := range Stringify(_updates) {
+	for k, v := range Stringify(POSTGRES, _updates) {
 
 		if t.GetMyField(k) == nil {
 			continue //remove non-table defined fields
@@ -334,7 +334,7 @@ func (self *PostgresLoader) SafeWhere(t *Table, crit map[string]interface{}) (st
 		}
 	}
 
-	whereClause := fmt.Sprintf(`WHERE 1=1  %s`, ToWhereString(wheres))
+	whereClause := fmt.Sprintf(`WHERE 1=1  %s`, ToWhereString(t, wheres))
 
 	return whereClause, nil
 
@@ -342,7 +342,7 @@ func (self *PostgresLoader) SafeWhere(t *Table, crit map[string]interface{}) (st
 
 func (self *PostgresLoader) SafeUpdate(t *Table, updates map[string]interface{}) []string {
 	up := []string{}
-	for k, v := range Stringify(updates) {
+	for k, v := range Stringify(POSTGRES, updates) {
 		field := t.GetField(k)
 		if field == nil {
 			continue

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+
 	//	"reflect"
 	"strings"
 	"time"
@@ -249,7 +250,7 @@ func itos(i interface{}) string {
 	return ""
 }
 
-func ToArray(i interface{}) []string {
+func ToArray(driverName string, i interface{}) []string {
 
 	ret := []string{}
 
@@ -275,7 +276,7 @@ func ToArray(i interface{}) []string {
 	}
 	if ints, ok := i.([]string); ok {
 		for _, v := range ints {
-			ret = append(ret, fmt.Sprintf("'%s'", Escape(v)))
+			ret = append(ret, fmt.Sprintf("'%s'", Escape(driverName, v)))
 		}
 		return ret
 	}
@@ -315,19 +316,22 @@ func ToArray(i interface{}) []string {
 	return ret
 }
 
-func (w *Where) Values() []string {
-
+func (w *Where) Values(t *Table) []string {
+	driverName := ""
+	if t != nil && t.Schema != nil {
+		driverName = t.Schema.DriverName
+	}
 	if needMultipleValues(w.Operator) {
 
-		return ToArray(w.Value)
+		return ToArray(driverName, w.Value)
 	}
 
-	return []string{InterfaceToString(w.Value)}
+	return []string{InterfaceToString(driverName, w.Value)}
 
 }
 
-func (w *Where) GetValueString() string {
-	values := w.Values()
+func (w *Where) GetValueString(t *Table) string {
+	values := w.Values(t)
 
 	if needMultipleValues(w.Operator) {
 		return fmt.Sprintf("(%s)", strings.Join(values, ", "))
@@ -339,7 +343,7 @@ func (w *Where) GetValueString() string {
 }
 
 //ProtectedString for $and and $or
-func (w *Where) ProtectedString() string {
+func (w *Where) ProtectedString(t *Table) string {
 	wheres, ok := w.Value.([]*Where)
 	if !ok {
 		fmt.Println(`bad nested where`)
@@ -349,7 +353,7 @@ func (w *Where) ProtectedString() string {
 	ret := []string{}
 	for _, w := range wheres {
 
-		ret = append(ret, w.String())
+		ret = append(ret, w.String(t))
 	}
 	//	return strings.Join(ret, " ")
 	cnn := ` 1=1 `
@@ -369,20 +373,20 @@ func (w *Where) ProtectedString() string {
 
 }
 
-func (w *Where) String() string {
+func (w *Where) String(t *Table) string {
 	if w.Protected {
-		_r := w.ProtectedString()
+		_r := w.ProtectedString(t)
 		fmt.Println(_r)
 		return _r
 	}
 	//TODO print values
 	if w.Operator == EQ {
 
-		if w.GetValueString() == fmt.Sprintf("'%s'", EXISTS) {
+		if w.GetValueString(t) == fmt.Sprintf("'%s'", EXISTS) {
 			return fmt.Sprintf(`%s %s %s`, ToSQLOperator(w.LogicOperator), w.FieldName, ToSQLOperator(EXISTS))
 		}
 
-		if w.GetValueString() == fmt.Sprintf("'%s'", NOT_EXISTS) {
+		if w.GetValueString(t) == fmt.Sprintf("'%s'", NOT_EXISTS) {
 			return fmt.Sprintf(`%s %s %s`, ToSQLOperator(w.LogicOperator), w.FieldName, ToSQLOperator(NOT_EXISTS))
 		}
 	}
@@ -421,16 +425,16 @@ func (w *Where) String() string {
 		ToSQLOperator(w.LogicOperator),
 		w.FieldName,
 		ToSQLOperator(w.Operator),
-		w.GetValueString(),
+		w.GetValueString(t),
 	)
 
 	return ret
 }
 
-func ToWhereString(wheres []*Where) string {
+func ToWhereString(t *Table, wheres []*Where) string {
 	ret := []string{}
 	for _, w := range wheres {
-		ret = append(ret, w.String())
+		ret = append(ret, w.String(t))
 	}
 	return strings.Join(ret, " ")
 }
@@ -598,7 +602,7 @@ func (t *Table) SafeWhere(crit map[string]interface{}) (string, error) {
 		}
 	}
 
-	whereClause := fmt.Sprintf(`WHERE 1=1  %s`, ToWhereString(wheres))
+	whereClause := fmt.Sprintf(`WHERE 1=1  %s`, ToWhereString(t, wheres))
 
 	return whereClause, nil
 

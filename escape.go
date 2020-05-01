@@ -6,7 +6,10 @@ import (
 
 var NO_ESCAPE = false
 
-func Escape(sql string) string {
+func Escape(driverName, sql string) string {
+	if driverName == MSSQL {
+		return strings.Replace(sql, "'", "''", -1)
+	}
 	if NO_ESCAPE {
 		return sql
 		return strings.Replace(sql, "'", "''", -1)
@@ -33,7 +36,7 @@ func Escape(sql string) string {
 			break
 		case '\'':
 			escape = '\''
-			
+
 			break
 		case '"': /* Better safe than sorry */
 			escape = '"'

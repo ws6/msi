@@ -7,7 +7,11 @@ import (
 
 func (t *Table) SafeUpdate(updates map[string]interface{}) []string {
 	up := []string{}
-	for k, v := range Stringify(updates) {
+	driverName := ""
+	if t.Schema != nil {
+		driverName = t.Schema.DriverName
+	}
+	for k, v := range Stringify(driverName, updates) {
 		field := t.GetField(k)
 		if field == nil {
 			continue

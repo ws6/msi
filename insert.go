@@ -7,13 +7,13 @@ import (
 	"time"
 )
 
-func InterfaceToString(i interface{}) string {
+func InterfaceToString(driverName string, i interface{}) string {
 
 	if i == nil {
 		return `null` //!!! mysql dialect
 	}
 	if s, ok := i.(string); ok {
-		return fmt.Sprintf("'%s'", Escape(s))
+		return fmt.Sprintf("'%s'", Escape(driverName, s))
 	}
 	if s, ok := i.(bool); ok {
 		if s {
@@ -55,11 +55,11 @@ func InterfaceToString(i interface{}) string {
 	return ""
 }
 
-func Stringify(updates map[string]interface{}) map[string]string {
+func Stringify(driverName string, updates map[string]interface{}) map[string]string {
 	ret := make(map[string]string)
 
 	for k, v := range updates {
-		ret[k] = InterfaceToString(v)
+		ret[k] = InterfaceToString(driverName, v)
 	}
 
 	return ret
@@ -74,7 +74,12 @@ func (t *Table) InsertQuery(_updates map[string]interface{}) (string, error) {
 	}
 
 	updates := []*NameVal{}
-	for k, v := range Stringify(_updates) {
+	driverName := ""
+	if t.Schema != nil {
+		driverName = t.Schema.DriverName
+	}
+
+	for k, v := range Stringify(driverName, _updates) {
 
 		if t.GetMyField(k) == nil {
 			continue //remove non-table defined fields
