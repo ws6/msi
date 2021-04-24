@@ -251,8 +251,6 @@ func (s *Stmt) CtxChan(ctx context.Context, limit int) chan map[string]interface
 
 	go func() {
 
-		defer fmt.Println(`CtxChan Closed`)
-
 		defer close(ret)
 
 		offset, ok := s.others[1][OFFSET].(int)
@@ -281,7 +279,7 @@ func (s *Stmt) CtxChan(ctx context.Context, limit int) chan map[string]interface
 				case ret <- result:
 					continue
 				case <-ctx.Done():
-					fmt.Println(`CtxChan Closed`)
+
 					return
 				}
 			}
