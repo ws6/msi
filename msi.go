@@ -3,6 +3,7 @@ package msi
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 
 	"time"
@@ -56,6 +57,7 @@ type Msi struct {
 	DriverName        string
 	DsnString         string //mysql or postgre
 	DatabaseName      string //database name or schema in postgres
+	Schema            string //schema namespace
 	tableNames        string
 	ForeignKeyTypeMap map[string]string
 	TimeoutSeconds    int //timeout map query
@@ -199,4 +201,9 @@ func getFieldFromInterface(table *Table, _col interface{}) (*Field, error) {
 func (self *Msi) NewCtx() (context.Context, func()) {
 	ctx := context.Background()
 	return context.WithTimeout(ctx, time.Duration(self.TimeoutSeconds+120)*time.Second)
+}
+
+//ToJson for debugging
+func (self *Msi) ToJson() ([]byte, error) {
+	return json.MarshalIndent(self.Tables, "", "  ")
 }

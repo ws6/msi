@@ -8,7 +8,7 @@ import (
 const DEFAULT_LIMIT = 30
 
 type Field struct {
-	table    *Table
+	table    *Table `json:"-"`
 	Name     string
 	Type     string
 	IsNumber bool
@@ -55,7 +55,7 @@ type Table struct {
 	TableName  string
 	*LifeCycle //lifecycle events
 	Limit      int
-	Schema     *Msi //pointer back to its parent
+	Schema     *Msi `json:"-"` //pointer back to its parent
 
 	JoinAlias string //used when join queries envoled; for use space
 	Fields    []*Field

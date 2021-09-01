@@ -22,3 +22,5 @@ sample_test.go
 *test.go
 *.csv
 test/
+*/*.pem
+*.pem
