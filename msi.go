@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"time"
 )
@@ -68,6 +69,11 @@ func (self *Msi) GetTable(tableName string) *Table {
 	for _, table := range self.Tables {
 		if table.TableName == tableName {
 			return table
+		}
+		if self.DriverName == SNOWFLAKE {
+			if strings.ToUpper(table.TableName) == strings.ToUpper(tableName) {
+				return table
+			}
 		}
 	}
 	return nil

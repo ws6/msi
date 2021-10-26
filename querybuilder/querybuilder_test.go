@@ -55,6 +55,9 @@ func TestBuildOneParam(t *testing.T) {
 		TestSet{
 			``, `$exists:true`, true,
 		},
+		TestSet{
+			``, `$null`, true,
+		},
 	}
 	for _, test := range tests {
 		and := make(map[string]interface{})
@@ -87,6 +90,9 @@ func TestBuild(t *testing.T) {
 		`createdat`:    `or:$lte:2012-11-26`,
 		`ProjectName`:  `$nin:abc,def,gha_123`,
 		`ProjectName2`: `$in:abc,def,gha_123`,
+		`project_id64`: `$null`,
+		`project_id`:   `$null`,
+		`project_id2`:  `$exists`,
 	}
 	fm := map[string]string{
 		`okay`:         `string`,
@@ -95,6 +101,9 @@ func TestBuild(t *testing.T) {
 		`createdat`:    `Time`,
 		`projectname`:  `string`,
 		`projectname2`: `string`,
+		`project_id`:   `int`,
+		`project_id2`:  `int`,
+		`project_id64`: `int64`,
 	}
 	m, err := BuildAllParams(params, fm)
 	if err != nil {

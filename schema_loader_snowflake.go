@@ -16,11 +16,15 @@ type SnowflakeLoader struct{}
 
 func (self *SnowflakeLoader) UpdateSchema(db *Msi) error {
 	sp := strings.Split(db.DatabaseName, ".")
-	if len(sp) != 2 {
+	if len(sp) == 0 {
 		return fmt.Errorf(`expect to use databasename.schema`)
 	}
 	db.DatabaseName = strings.ToUpper(sp[0])
-	db.Schema = strings.ToUpper(sp[1])
+	db.Schema = `PUBLIC` //default
+	if len(sp) >= 2 {
+		db.Schema = strings.ToUpper(sp[1])
+	}
+
 	return nil
 }
 func (self *SnowflakeLoader) LoadForeignKeys(db *Msi) error {
@@ -235,4 +239,26 @@ func (self *SnowflakeLoader) GetPrimaryKey(db *Msi, table *Table) (map[string]bo
 	}
 
 	return ret, nil
+}
+
+//parse VARIANT type into json. only one level down
+
+func (table *Table) MarshalVariantIntoJson(results []map[string]interface{}) error {
+	// table.AfterFinds = append(table.AfterFinds, table.MarshalVariantIntoJson)
+	for _, m := range results {
+		for k, v := range m {
+			field := table.GetField(k)
+			if field == nil {
+				continue
+			}
+			if field.Type != `VARIANT` {
+				continue
+			}
+			//now we need do it
+			//v is type of string. marshall it into msi.M
+			_ = v
+		}
+
+	}
+	return nil
 }

@@ -3,37 +3,37 @@ package msi
 import (
 	"fmt"
 	"log"
-	"strconv"
+
 	"strings"
 	"sync"
 	"time"
 )
 
 func init() {
-	dialector[MSSQL] = new(MSSQLLoader) //syntax help. no usage
+	dialector[SNOWFLAKE] = new(SnowflakeLoader)
 }
 
-var ERR_NOT_IMPL = fmt.Errorf(`not implemented`)
-
-func (self *MSSQLLoader) getTableName(t *Table) string {
+func (self *SnowflakeLoader) getTableName(t *Table) string {
 	if t.Schema == nil {
 		return t.TableName
 	}
 
-	return fmt.Sprintf("[%s].[dbo].[%s]",
-		t.Schema.DatabaseName,
-		t.TableName)
+	return fmt.Sprintf(`"%s"."%s"."%s"`,
+		strings.ToUpper(t.Schema.DatabaseName),
+		strings.ToUpper(t.Schema.Schema),
+		strings.ToUpper(t.TableName),
+	)
 }
 
-func (m *MSSQLLoader) FullName(self *Field) string {
+func (m *SnowflakeLoader) FullName(self *Field) string {
 	if self.table == nil {
 		return self.Name
 	}
 	//TODO check if it is postgres?
-	return fmt.Sprintf("[%s].[%s]", self.table.TableName, self.Name)
+	return fmt.Sprintf(`%s."%s"`, m.getTableName(self.table), self.Name)
 }
 
-func (m *MSSQLLoader) FullNameAS(self *Field, k, tableAlias string) string { // useing double underscores for uniqueness
+func (m *SnowflakeLoader) FullNameAS(self *Field, k, tableAlias string) string { // useing double underscores for uniqueness
 	if self.table == nil {
 		return self.Name
 	}
@@ -41,68 +41,7 @@ func (m *MSSQLLoader) FullNameAS(self *Field, k, tableAlias string) string { // 
 	return fmt.Sprintf("[%s].[%s] AS %s__%s", tableAlias, self.Name, k, self.Name)
 }
 
-type SinceField struct {
-	By        string
-	FieldName string
-	GTE       *int //greater equal than, if negative, ignore
-	LT        *int // less than , if negative igore
-}
-
-func (o *SinceField) SelectFieldName() string {
-	return fmt.Sprintf(` DATEDIFF(%s, %s, getdate()) as %s  `, o.By, o.FieldName, o.AsName())
-}
-func (o *SinceField) AsName() string {
-	return fmt.Sprintf(`[%s_since_%s]`, o.By, o.FieldName)
-}
-
-func NewSinceField(f string) *SinceField {
-	by := `day`
-	fieldName := f
-	_f := strings.Split(f, ",") // the first one is field name and the second one is precision
-	if len(_f) >= 2 {
-		fieldName = _f[0]
-		by = _f[1]
-	}
-
-	ret := new(SinceField)
-	ret.By = by
-	ret.FieldName = fieldName
-
-	if len(_f) >= 4 {
-		if n, err := strconv.Atoi(_f[2]); err == nil {
-			ret.GTE = &n
-		}
-		if n, err := strconv.Atoi(_f[3]); err == nil {
-			ret.LT = &n
-		}
-
-	}
-	return ret
-}
-
-func IsAggField(s string) bool {
-	startsWith := []string{
-		`sum`,
-		`avg`,
-		`count`,
-		`min`,
-		`max`,
-		`stdev`,
-		`stdevp`,
-		`var`,
-		`varp`,
-		`count_big`,
-		`approx_count_distinct`,
-	}
-	for _, v := range startsWith {
-		if strings.HasPrefix(strings.ToLower(s), v+"(") {
-			return true
-		}
-	}
-	return false
-}
-
-func (self *MSSQLLoader) find(t *Table, others ...map[string]interface{}) (selectedFields []string, nonSelectClause string, orderby []string, limit int, offset int, err error) {
+func (self *SnowflakeLoader) find(t *Table, others ...map[string]interface{}) (selectedFields []string, nonSelectClause string, orderby []string, limit int, offset int, err error) {
 	for _, field := range t.Fields {
 		if field.Selected {
 			selectedFields = append(selectedFields, self.FullName(field))
@@ -275,14 +214,6 @@ func (self *MSSQLLoader) find(t *Table, others ...map[string]interface{}) (selec
 	if len(mq.SinceCountby) > 0 {
 
 		for _, f := range mq.SinceCountby {
-			//only change the selected fields
-			//			by := `day`
-			//			fieldName := f
-			//			_f := strings.Split(f, ",") // the first one is field name and the second one is precision
-			//			if len(_f) >= 2 {
-			//				fieldName = _f[0]
-			//				by = _f[1]
-			//			}
 
 			field := NewSinceField(f).SelectFieldName()
 			selectedFields = append(selectedFields, field)
@@ -308,14 +239,8 @@ func (self *MSSQLLoader) find(t *Table, others ...map[string]interface{}) (selec
 	return
 }
 
-type pattern struct {
-	pat      string
-	field    *Field
-	operator string
-}
-
 //replaceUnsafeFields a patch for remove unsafe field names
-func (self *MSSQLLoader) replaceUnsafeFields(t *Table, sql string) string {
+func (self *SnowflakeLoader) replaceUnsafeFields(t *Table, sql string) string {
 	//getOperators
 	if len(t.unsafeFieldsPatterns) == 0 {
 		unsafeFieldsPatterns := []*pattern{}
@@ -337,7 +262,7 @@ func (self *MSSQLLoader) replaceUnsafeFields(t *Table, sql string) string {
 }
 
 //ORToUnion convert or query to union
-func (self *MSSQLLoader) ORToUnion(t *Table, sql string) string {
+func (self *SnowflakeLoader) ORToUnion(t *Table, sql string) string {
 	unions := []string{}
 	or_list := []string{}
 	flag := ` OR `
@@ -392,7 +317,7 @@ func (self *MSSQLLoader) ORToUnion(t *Table, sql string) string {
 	return strings.Join(unions, " union \n")
 }
 
-func (self *MSSQLLoader) FindQuery(t *Table, crit ...map[string]interface{}) (string, error) {
+func (self *SnowflakeLoader) FindQuery(t *Table, crit ...map[string]interface{}) (string, error) {
 
 	//!!!below is mysql dialect by default
 	selectedFields, nonSelectClause, orderby, limit, offset, err := self.find(t, crit...)
@@ -433,7 +358,7 @@ func (self *MSSQLLoader) FindQuery(t *Table, crit ...map[string]interface{}) (st
 
 }
 
-func (self *MSSQLLoader) CountQuery(t *Table, others ...map[string]interface{}) (string, error) {
+func (self *SnowflakeLoader) CountQuery(t *Table, others ...map[string]interface{}) (string, error) {
 
 	_, nonSelectClause, _, _, _, err := self.find(t, others...)
 	if err != nil {
@@ -447,7 +372,7 @@ func (self *MSSQLLoader) CountQuery(t *Table, others ...map[string]interface{}) 
 
 }
 
-func (self *MSSQLLoader) InsertQuery(t *Table, _updates map[string]interface{}) (string, error) {
+func (self *SnowflakeLoader) InsertQuery(t *Table, _updates map[string]interface{}) (string, error) {
 	q, err := self.insertQuery(t, _updates)
 	if err != nil {
 		return "", err
@@ -456,7 +381,7 @@ func (self *MSSQLLoader) InsertQuery(t *Table, _updates map[string]interface{}) 
 	return q, nil
 }
 
-func (self *MSSQLLoader) MakeInsertFields(t *Table, updates []*NameVal) []string {
+func (self *SnowflakeLoader) MakeInsertFields(t *Table, updates []*NameVal) []string {
 	ret := []string{}
 
 	for _, item := range updates {
@@ -471,13 +396,13 @@ func (self *MSSQLLoader) MakeInsertFields(t *Table, updates []*NameVal) []string
 	return ret
 }
 
-func (self *MSSQLLoader) Escape(sql string) string {
+func (self *SnowflakeLoader) Escape(sql string) string {
 
 	return strings.Replace(sql, "'", "''", -1)
 
 }
 
-func (self *MSSQLLoader) InterfaceToString(i interface{}) string {
+func (self *SnowflakeLoader) InterfaceToString(i interface{}) string {
 
 	if i == nil {
 		return `null` //!!! mysql dialect
@@ -525,7 +450,7 @@ func (self *MSSQLLoader) InterfaceToString(i interface{}) string {
 	return ""
 }
 
-func (self *MSSQLLoader) Stringify(updates map[string]interface{}) map[string]string {
+func (self *SnowflakeLoader) Stringify(updates map[string]interface{}) map[string]string {
 	ret := make(map[string]string)
 
 	for k, v := range updates {
@@ -536,7 +461,7 @@ func (self *MSSQLLoader) Stringify(updates map[string]interface{}) map[string]st
 
 }
 
-func (self *MSSQLLoader) insertQuery(t *Table, _updates map[string]interface{}) (string, error) {
+func (self *SnowflakeLoader) insertQuery(t *Table, _updates map[string]interface{}) (string, error) {
 
 	updates := []*NameVal{}
 
@@ -558,7 +483,7 @@ func (self *MSSQLLoader) insertQuery(t *Table, _updates map[string]interface{}) 
 
 }
 
-func (self *MSSQLLoader) SafeWhere(t *Table, crit map[string]interface{}) (string, error) {
+func (self *SnowflakeLoader) SafeWhere(t *Table, crit map[string]interface{}) (string, error) {
 	if crit == nil {
 		return "", nil
 	}
@@ -609,7 +534,7 @@ func (self *MSSQLLoader) SafeWhere(t *Table, crit map[string]interface{}) (strin
 
 }
 
-func (self *MSSQLLoader) SafeUpdate(t *Table, updates map[string]interface{}) []string {
+func (self *SnowflakeLoader) SafeUpdate(t *Table, updates map[string]interface{}) []string {
 	up := []string{}
 	for k, v := range self.Stringify(updates) {
 		field := t.GetField(k)
@@ -634,7 +559,7 @@ func (self *MSSQLLoader) SafeUpdate(t *Table, updates map[string]interface{}) []
 	return up
 }
 
-func (self *MSSQLLoader) UpdateQuery(t *Table, crit, updates map[string]interface{}) (string, error) {
+func (self *SnowflakeLoader) UpdateQuery(t *Table, crit, updates map[string]interface{}) (string, error) {
 	up := self.SafeUpdate(t, updates)
 
 	ret := fmt.Sprintf(`UPDATE %s SET %s`,
@@ -655,7 +580,7 @@ func (self *MSSQLLoader) UpdateQuery(t *Table, crit, updates map[string]interfac
 }
 
 //(t *Table) RemoveQuery(crit map[string]interface{}) (string, error)
-func (self *MSSQLLoader) RemoveQuery(t *Table, crit map[string]interface{}) (string, error) {
+func (self *SnowflakeLoader) RemoveQuery(t *Table, crit map[string]interface{}) (string, error) {
 	whereClause, err := self.SafeWhere(t, crit)
 	if err != nil {
 		return "", err
@@ -664,7 +589,7 @@ func (self *MSSQLLoader) RemoveQuery(t *Table, crit map[string]interface{}) (str
 	return ret, nil
 }
 
-func (self *MSSQLLoader) GetGroupCountPage(t *Table, others ...map[string]interface{}) (*Page, error) {
+func (self *SnowflakeLoader) GetGroupCountPage(t *Table, others ...map[string]interface{}) (*Page, error) {
 	ret := new(Page)
 	ret.Limit = t.Limit
 
@@ -704,7 +629,7 @@ func (self *MSSQLLoader) GetGroupCountPage(t *Table, others ...map[string]interf
 
 }
 
-func (self *MSSQLLoader) GetGroupCountPageCount(t *Table, others ...map[string]interface{}) (int, error) {
+func (self *SnowflakeLoader) GetGroupCountPageCount(t *Table, others ...map[string]interface{}) (int, error) {
 	selectedFields, nonSelectClause, _, _, _, err := self.find(t, others...)
 	if err != nil {
 		return 0, err
@@ -713,7 +638,7 @@ func (self *MSSQLLoader) GetGroupCountPageCount(t *Table, others ...map[string]i
 
 	countQuery := fmt.Sprintf(`SELECT count(*) as count FROM (%s) temp`, rawQuery)
 	if DEBUG {
-		fmt.Println(`MSSQLLoader countQuery`, countQuery)
+		fmt.Println(`SnowflakeLoader countQuery`, countQuery)
 	}
 	if DEBUG {
 		fmt.Println(countQuery)
@@ -723,7 +648,7 @@ func (self *MSSQLLoader) GetGroupCountPageCount(t *Table, others ...map[string]i
 	}
 	rows, err := t.Schema.Db.Query(countQuery)
 	if DEBUG {
-		fmt.Println(`MSSQLLoader rawQuery`, rawQuery)
+		fmt.Println(`SnowflakeLoader rawQuery`, rawQuery)
 	}
 	if err != nil {
 
@@ -742,14 +667,14 @@ func (self *MSSQLLoader) GetGroupCountPageCount(t *Table, others ...map[string]i
 	return 0, nil
 }
 
-func (self *MSSQLLoader) GetSinceCountPageTotal(t *Table, others ...map[string]interface{}) (int, error) {
+func (self *SnowflakeLoader) GetSinceCountPageTotal(t *Table, others ...map[string]interface{}) (int, error) {
 	return 0, nil
 }
-func (self *MSSQLLoader) GetSinceCountPageSum(t *Table, others ...map[string]interface{}) (int, error) {
+func (self *SnowflakeLoader) GetSinceCountPageSum(t *Table, others ...map[string]interface{}) (int, error) {
 	return 0, nil
 }
 
-func (self *MSSQLLoader) GetSinceCountQuery(t *Table, others ...map[string]interface{}) (string, error) {
+func (self *SnowflakeLoader) GetSinceCountQuery(t *Table, others ...map[string]interface{}) (string, error) {
 	mq, err := t.ParseMetaQuery(others[1])
 	if err != nil {
 		return "", err
@@ -786,7 +711,7 @@ func (self *MSSQLLoader) GetSinceCountQuery(t *Table, others ...map[string]inter
 	return newQuery, nil
 }
 
-func (self *MSSQLLoader) GetSinceCountPage(t *Table, others ...map[string]interface{}) (*Page, error) {
+func (self *SnowflakeLoader) GetSinceCountPage(t *Table, others ...map[string]interface{}) (*Page, error) {
 
 	mq, err := t.ParseMetaQuery(others[1])
 	if err != nil {

@@ -40,6 +40,7 @@ var (
 		"$in",
 		"$nin",
 		"$exists",
+		"$null",
 		"$regex",
 		"$like",
 	}
@@ -133,9 +134,9 @@ func BuildOne(kType string, text string, needOr bool, m map[string]interface{}) 
 		return nil //!!! skip done
 	}
 
-	if text == `$exists` {
+	if text == `$exists` || text == `$null` {
 
-		m[text] = ""
+		m[text] = true
 
 		return nil
 	}
@@ -151,7 +152,8 @@ func BuildOne(kType string, text string, needOr bool, m map[string]interface{}) 
 	if vals == "" {
 		return fmt.Errorf(`no value found ` + text)
 	}
-	if op == `$exists` {
+	if op == `$exists` || op == `$null` {
+
 		m[op] = false
 		if vals == `true` {
 			m[op] = true
@@ -193,15 +195,25 @@ func BuildOne(kType string, text string, needOr bool, m map[string]interface{}) 
 	for _, v := range splits {
 		var _v interface{}
 		_v = v
+		var err error
 		switch kType {
 		case `string`:
 			_v = v
 		case `int`:
-			_v, _ = strconv.Atoi(v)
+			_v, err = strconv.Atoi(v)
+			if err != nil {
+				_v = v
+			}
 		case `int64`:
-			_v, _ = strconv.ParseInt(v, 10, 64)
+			_v, err = strconv.ParseInt(v, 10, 64)
+			if err != nil {
+				_v = v
+			}
 		case `float64`:
-			_v, _ = strconv.ParseFloat(v, 64)
+			_v, err = strconv.ParseFloat(v, 64)
+			if err != nil {
+				_v = v
+			}
 		case `float32`:
 			if f32, err := strconv.ParseFloat(v, 64); err == nil {
 				_v = float32(f32)
