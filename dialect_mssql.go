@@ -508,7 +508,7 @@ func (self *MSSQLLoader) InterfaceToString(i interface{}) string {
 	// sqlTimeFormatter := "'%04d-%02d-%02d %02d:%02d:%02d'"
 	sqlTimeFormatter := "2006-01-02 15:04:05.000"
 	if s, ok := i.(time.Time); ok {
-		return s.Format(sqlTimeFormatter)
+		return fmt.Sprintf(`'%s'`, s.Format(sqlTimeFormatter))
 		return fmt.Sprintf(sqlTimeFormatter, s.Year(), s.Month(), s.Day(), s.Hour(), s.Minute(), s.Second()) //TODO to be better formatted
 	}
 
@@ -516,7 +516,7 @@ func (self *MSSQLLoader) InterfaceToString(i interface{}) string {
 
 		if tPtr != nil {
 			s := *tPtr
-			return s.Format(sqlTimeFormatter)
+			return fmt.Sprintf(`'%s'`, s.Format(sqlTimeFormatter))
 			return fmt.Sprintf(sqlTimeFormatter, s.Year(), s.Month(), s.Day(), s.Hour(), s.Minute(), s.Second()) //TODO to be better formatted
 		}
 
