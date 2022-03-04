@@ -49,7 +49,7 @@ func InterfaceToString(driverName string, i interface{}) string {
 
 	}
 
-	if DEBUG {
+	if IsDebug() {
 		log.Println(`can not figure out type of interface `, i)
 	}
 	return ""

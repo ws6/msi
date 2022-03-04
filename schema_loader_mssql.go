@@ -80,8 +80,7 @@ rc.name as reference_column_name ,
 */
 
 func (self *MSSQLLoader) DataType(colDataType string) string {
-
-	kFieldTypes := map[string]string{
+	var kFieldTypes = map[string]string{
 		"text":      "[]byte",
 		"date":      "time.Time",
 		"datetime":  "time.Time",
@@ -106,6 +105,7 @@ func (self *MSSQLLoader) DataType(colDataType string) string {
 		"bit":     "uint64",
 		//		"numeric": "float64",
 	}
+
 	fieldType, ok := kFieldTypes[strings.ToLower(colDataType)]
 	if !ok {
 		//		for k, v := range kFieldTypes {
@@ -164,6 +164,37 @@ func (self *MSSQLLoader) SetVersion(db *Msi) error {
 
 }
 
+func (self *MSSQLLoader) getTableColumns(tableName string, table *Table, columns []map[string]interface{}) ([]*Field, error) {
+
+	ret := []*Field{}
+	for _, col := range columns {
+		_tableName, err := ToString(col[`table_name`])
+		if err != nil {
+			return nil, err
+		}
+		if _tableName != tableName {
+			continue
+		}
+		_colName, err := ToString(col[`column_name`])
+		if err != nil {
+			return nil, err
+		}
+		_colType, err := ToString(col[`type_name`])
+		if err != nil {
+			return nil, err
+		}
+
+		ret = append(ret, &Field{
+			table:    table,
+			Name:     _colName,
+			Type:     self.DataType(_colType),
+			IsNumber: IsNumber(_colType),
+			Selected: true,
+		})
+	}
+	return ret, nil
+}
+
 func (self *MSSQLLoader) LoadDatabaseSchema(db *Msi) error {
 
 	// if err := self.SetVersion(db); err != nil {
@@ -175,36 +206,6 @@ func (self *MSSQLLoader) LoadDatabaseSchema(db *Msi) error {
 		return err
 	}
 
-	getTableColumns := func(tableName string, table *Table) ([]*Field, error) {
-
-		ret := []*Field{}
-		for _, col := range columns {
-			_tableName, err := ToString(col[`table_name`])
-			if err != nil {
-				return nil, err
-			}
-			if _tableName != tableName {
-				continue
-			}
-			_colName, err := ToString(col[`column_name`])
-			if err != nil {
-				return nil, err
-			}
-			_colType, err := ToString(col[`type_name`])
-			if err != nil {
-				return nil, err
-			}
-
-			ret = append(ret, &Field{
-				table:    table,
-				Name:     _colName,
-				Type:     self.DataType(_colType),
-				IsNumber: IsNumber(_colType),
-				Selected: true,
-			})
-		}
-		return ret, nil
-	}
 	//dsnString, schema, tableNames string
 	//	db, err := sql.Open(MSSQL, db.DsnString)
 	//TODO allow user cherry picking which tables
@@ -239,7 +240,7 @@ WHERE schema_id = SCHEMA_ID('dbo')
 		table.Schema = db
 		table.Limit = DEFAULT_LIMIT
 
-		table.Fields, err = getTableColumns(table.TableName, table)
+		table.Fields, err = self.getTableColumns(table.TableName, table, columns)
 		if err != nil {
 			return err
 		}

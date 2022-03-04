@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
 	"time"
@@ -15,9 +16,16 @@ const (
 )
 
 var (
-	DEBUG     = false
-	USE_LOCAL = true //parser time into Local instead of UTC
+// IsDebug()     = false
+// UseLocal() = true //parser time into Local instead of UTC
 )
+
+func IsDebug() bool {
+	return os.Getenv(`MSI_IsDebug()`) == `true`
+}
+func UseLocal() bool {
+	return os.Getenv(`MSI_UseLocal()`) == `true`
+}
 
 type M map[string]interface{}
 
@@ -81,6 +89,9 @@ func (self *Msi) GetTable(tableName string) *Table {
 
 //dont forgot to close
 func (self *Msi) Close() error {
+	self.ForeignKeyTypeMap = nil
+	self.Tables = nil
+
 	if self.Db != nil {
 		return self.Db.Close() //provide a Close interface
 	}

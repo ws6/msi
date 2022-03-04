@@ -66,7 +66,7 @@ func (self *Table) GetGroupCountPageCount(others ...map[string]interface{}) (int
 
 	countQuery := fmt.Sprintf(`SELECT count(*) as count FROM (%s) temp`, rawQuery)
 	fmt.Println(`countQuery`, countQuery)
-	if DEBUG {
+	if IsDebug() {
 		fmt.Println(countQuery)
 	}
 	if self.Schema == nil {
@@ -264,7 +264,7 @@ func (s *Stmt) CtxChan(ctx context.Context, limit int) chan map[string]interface
 			s.others[1][OFFSET] = offset
 
 			if err != nil {
-				if DEBUG || true {
+				if IsDebug() || true {
 					log.Println(`CtxChan err:`, err.Error())
 				}
 				return
@@ -323,7 +323,7 @@ func (s *Stmt) ClosableChan(limit int, done <-chan bool) chan map[string]interfa
 			s.others[1][OFFSET] = offset
 
 			if err != nil {
-				if DEBUG {
+				if IsDebug() {
 					log.Println(err.Error())
 				}
 				break
@@ -377,7 +377,7 @@ func (s *Stmt) CountContext(ctx context.Context) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	if DEBUG {
+	if IsDebug() {
 		log.Println(query)
 	}
 
@@ -463,7 +463,7 @@ func ParseByte(_type string, b []byte) interface{} {
 	sb := string(b)
 	switch _type {
 	default:
-		if DEBUG {
+		if IsDebug() {
 			log.Panicln(`unsupported type`, _type, string(b))
 		}
 		return b
@@ -496,13 +496,13 @@ func ParseByte(_type string, b []byte) interface{} {
 				//				if len(sb) >= formatLen {
 				//					_sb = sb[0 : formatLen-1]
 				//				}
-				if USE_LOCAL {
+				if UseLocal() {
 					t, err := time.ParseInLocation(format, _sb, time.Local)
 					if err == nil {
 						return t
 					}
 					if err != nil {
-						if DEBUG {
+						if IsDebug() {
 							log.Println(`wrong time formatter`, _type, sb, err.Error())
 						}
 
@@ -512,7 +512,7 @@ func ParseByte(_type string, b []byte) interface{} {
 				t, err = time.Parse(format, _sb)
 
 				if err == nil {
-					//					if USE_LOCAL {
+					//					if UseLocal() {
 					//						return t.Local()
 					//					}
 					return t
@@ -520,7 +520,7 @@ func ParseByte(_type string, b []byte) interface{} {
 
 			}
 			if err != nil {
-				if DEBUG {
+				if IsDebug() {
 					log.Println(`wrong time formatter`, _type, sb, err.Error())
 				}
 
@@ -619,7 +619,7 @@ func (s *Stmt) MapContext(ctx context.Context, moreTypeMap ...map[string]string)
 	if err != nil {
 		return nil, err
 	}
-	if DEBUG {
+	if IsDebug() {
 		log.Println(query)
 	}
 
@@ -666,7 +666,7 @@ func (self *Table) insert(ctx context.Context, _updates map[string]interface{}) 
 	if err != nil {
 		return err
 	}
-	if DEBUG {
+	if IsDebug() {
 		log.Println(query)
 	}
 	// ctx, cancelFn := self.Schema.NewCtx()
@@ -730,7 +730,7 @@ func (self *Table) update(ctx context.Context, crit, updates map[string]interfac
 	if err != nil {
 		return err
 	}
-	if DEBUG {
+	if IsDebug() {
 		log.Println(query)
 	}
 	_, err = self.Schema.Db.ExecContext(ctx, query)
@@ -805,7 +805,7 @@ func (self *Table) remove(ctx context.Context, crit map[string]interface{}) erro
 	if err != nil {
 		return err
 	}
-	if DEBUG {
+	if IsDebug() {
 		log.Println(query)
 	}
 	// ctx, cancelFn := self.Schema.NewCtx()
@@ -896,7 +896,7 @@ func (self *Msi) installForeignKeyMap() {
 	}
 }
 func (self *Msi) MapContext(ctx context.Context, db *sql.DB, query string, typeMap map[string]string, ctxs ...context.Context) ([]map[string]interface{}, error) {
-	if DEBUG || self.Debug {
+	if IsDebug() || self.Debug {
 		fmt.Println(query)
 	}
 	if self.ForeignKeyTypeMap == nil {

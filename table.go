@@ -162,7 +162,7 @@ func (t *Table) MakeInsertValues(updates []*NameVal) []string {
 			_v = fmt.Sprintf("%s", _v)
 		}
 		if _f.Type == "time.Time" {
-			if DEBUG {
+			if IsDebug() {
 				fmt.Println(_f.Name, _f.Type, _v)
 
 			}

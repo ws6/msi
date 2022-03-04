@@ -522,7 +522,7 @@ func (self *MSSQLLoader) InterfaceToString(i interface{}) string {
 
 	}
 
-	if DEBUG {
+	if IsDebug() {
 		log.Println(`can not figure out type of interface `, i)
 	}
 	return ""
@@ -715,17 +715,17 @@ func (self *MSSQLLoader) GetGroupCountPageCount(t *Table, others ...map[string]i
 	rawQuery := fmt.Sprintf(`SELECT %s %s`, strings.Join(selectedFields, ", "), nonSelectClause)
 
 	countQuery := fmt.Sprintf(`SELECT count(*) as count FROM (%s) temp`, rawQuery)
-	if DEBUG {
+	if IsDebug() {
 		fmt.Println(`MSSQLLoader countQuery`, countQuery)
 	}
-	if DEBUG {
+	if IsDebug() {
 		fmt.Println(countQuery)
 	}
 	if t.Schema == nil {
 		return 0, fmt.Errorf(`no schema pointer found from table[%s]`, t.TableName)
 	}
 	rows, err := t.Schema.Db.Query(countQuery)
-	if DEBUG {
+	if IsDebug() {
 		fmt.Println(`MSSQLLoader rawQuery`, rawQuery)
 	}
 	if err != nil {

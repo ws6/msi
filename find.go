@@ -583,7 +583,7 @@ func (t *Table) SafeWhere(crit map[string]interface{}) (string, error) {
 		}
 		//!!!exception for special format foreign keys; and dont re-write it
 		if allowedForeignKeyField(where.FieldName) {
-			if DEBUG {
+			if IsDebug() {
 				log.Println(`fk is allowed`, where.FieldName)
 			}
 			wheres = append(wheres, where)
@@ -596,7 +596,7 @@ func (t *Table) SafeWhere(crit map[string]interface{}) (string, error) {
 				wheres = append(wheres, where)
 				continue
 			}
-			//			if DEBUG {
+			//			if IsDebug() {
 			//				log.Println(`where fieldname get filtered `, where.FieldName, t.TableName)
 			//			}
 		}
@@ -749,7 +749,7 @@ func (t *Table) find(others ...map[string]interface{}) (selectedFields []string,
 		return
 	}
 
-	if DEBUG {
+	if IsDebug() {
 		log.Printf("%+v", mq)
 	}
 

@@ -23,12 +23,12 @@ var (
 
 func TestLoadTables(t *testing.T) {
 
-	debug := msi.DEBUG
-	msi.DEBUG = true
+	debug := msi.IsDebug()
+	msi.IsDebug() = true
 	oldFlags := log.Flags()
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	defer func() {
-		msi.DEBUG = debug
+		msi.IsDebug() = debug
 		log.SetFlags(oldFlags)
 	}()
 	schema, err := msi.NewDb(`mysql`, `username:password@(localhost:3306)/databasename`, `databasename`, ``)

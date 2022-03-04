@@ -81,7 +81,7 @@ func ToTime(i interface{}) (*time.Time, error) {
 	if err != nil {
 		return nil, err
 	}
-	if USE_LOCAL {
+	if UseLocal() {
 		if t == nil {
 			return t, err
 		}
