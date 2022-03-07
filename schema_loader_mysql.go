@@ -10,7 +10,7 @@ import (
 const MYSQL = `mysql`
 
 func init() {
-	Loaders[MYSQL] = new(MySqlLoader)
+	RegisterLoader(MYSQL, new(MySqlLoader))
 }
 
 type MySqlLoader struct {

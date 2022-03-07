@@ -94,7 +94,7 @@ func (self *Table) GetGroupCountPageCount(others ...map[string]interface{}) (int
 }
 
 func (self *Table) GetSinceCountPage(others ...map[string]interface{}) (*Page, error) {
-	if dl, ok := self.Schema.loader.(Dialect); ok {
+	if dl, ok := self.Schema.GetLoader().(Dialect); ok {
 		res, err := dl.GetSinceCountPage(self, others...)
 		if err == nil {
 			return res, nil
@@ -109,7 +109,7 @@ func (self *Table) GetSinceCountPage(others ...map[string]interface{}) (*Page, e
 
 func (self *Table) GetGroupCountPage(others ...map[string]interface{}) (*Page, error) {
 
-	if dl, ok := self.Schema.loader.(Dialect); ok {
+	if dl, ok := self.Schema.GetLoader().(Dialect); ok {
 		res, err := dl.GetGroupCountPage(self, others...)
 		if err == nil {
 			return res, nil

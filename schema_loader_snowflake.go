@@ -9,7 +9,7 @@ import (
 const SNOWFLAKE = `snowflake`
 
 func init() {
-	Loaders[SNOWFLAKE] = new(SnowflakeLoader)
+	RegisterLoader(SNOWFLAKE, new(SnowflakeLoader))
 }
 
 type SnowflakeLoader struct{}

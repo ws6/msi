@@ -11,7 +11,7 @@ import (
 const MSSQL = `mssql`
 
 func init() {
-	Loaders[MSSQL] = new(MSSQLLoader)
+	RegisterLoader(MSSQL, new(MSSQLLoader))
 }
 
 type TableSchema drivers.TableSchema

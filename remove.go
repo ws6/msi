@@ -9,7 +9,7 @@ func (t *Table) RemoveQuery(crit map[string]interface{}) (string, error) {
 		return "", fmt.Errorf(`can not remove without where clause`)
 	}
 
-	if dl, ok := t.Schema.loader.(Dialect); ok {
+	if dl, ok := t.Schema.GetLoader().(Dialect); ok {
 		return dl.RemoveQuery(t, crit)
 	}
 	whereClause, err := t.SafeWhere(crit)

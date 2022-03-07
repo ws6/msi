@@ -22,7 +22,8 @@ import (
 const POSTGRES = `postgres`
 
 func init() {
-	Loaders[POSTGRES] = new(PostgresLoader)
+
+	RegisterLoader(POSTGRES, new(PostgresLoader))
 }
 
 type PostgresLoader struct {

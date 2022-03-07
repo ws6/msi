@@ -892,7 +892,7 @@ func (t *Table) find(others ...map[string]interface{}) (selectedFields []string,
 //Find filter out bad fields and correct types to make query
 func (t *Table) FindQuery(others ...map[string]interface{}) (string, error) {
 
-	if dl, ok := t.Schema.loader.(Dialect); ok {
+	if dl, ok := t.Schema.GetLoader().(Dialect); ok {
 		return dl.FindQuery(t, others...)
 	}
 	//!!!below is mysql dialect by default
@@ -922,7 +922,7 @@ func (t *Table) FindQuery(others ...map[string]interface{}) (string, error) {
 
 //Count the field name out of this query is "count" in lowercase
 func (t *Table) CountQuery(others ...map[string]interface{}) (string, error) {
-	if dl, ok := t.Schema.loader.(Dialect); ok {
+	if dl, ok := t.Schema.GetLoader().(Dialect); ok {
 		return dl.CountQuery(t, others...)
 	}
 	_, nonSelectClause, _, _, _, err := t.find(others...)

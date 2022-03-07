@@ -59,7 +59,7 @@ type LifeCycle struct {
 }
 
 type Msi struct {
-	loader            ShemaLoader
+	// loader            ShemaLoader
 	Tables            []*Table
 	*LifeCycle        //global lifecycle; note there is a table level lifecycle as well
 	Db                *sql.DB
@@ -71,6 +71,10 @@ type Msi struct {
 	ForeignKeyTypeMap map[string]string
 	TimeoutSeconds    int //timeout map query
 	Debug             bool
+}
+
+func (self *Msi) GetLoader() ShemaLoader {
+	return GetLoader(self.DriverName)
 }
 
 func (self *Msi) GetTable(tableName string) *Table {
@@ -95,6 +99,7 @@ func (self *Msi) Close() error {
 	if self.Db != nil {
 		return self.Db.Close() //provide a Close interface
 	}
+	self = nil
 
 	return nil
 }
@@ -142,11 +147,11 @@ func NewDb(driver, dsnString, schema, tableNames string) (*Msi, error) {
 		return nil, err
 	}
 
-	loader, ok := Loaders[driver]
-	if !ok {
+	loader := GetLoader(driver)
+	if loader == nil {
 		return nil, fmt.Errorf(`no loader defined for driver [%s]`, driver)
 	}
-	ret.loader = loader
+	// ret.loader = loader
 	//	dbSchema, err := loader.LoadDatabaseSchema(ret.DsnString, ret.DatabaseName, ret.tableNames)
 	if err := loader.LoadDatabaseSchema(ret); err != nil {
 		return nil, err
@@ -155,7 +160,7 @@ func NewDb(driver, dsnString, schema, tableNames string) (*Msi, error) {
 	if err := loader.LoadForeignKeys(ret); err != nil {
 		return nil, err
 	}
-	RegisterMsi(ret)
+	// RegisterMsi(ret) //do not register autmatically, mem-leak
 	return ret, nil
 }
 

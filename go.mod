@@ -6,6 +6,7 @@ require (
 	github.com/Azure/azure-storage-blob-go v0.14.0 // indirect
 	github.com/apache/arrow/go/arrow v0.0.0-20210831195552-ff5572c84511 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.5.0 // indirect
+	github.com/denisenkom/go-mssqldb v0.12.0 // indirect
 	github.com/form3tech-oss/jwt-go v3.2.5+incompatible // indirect
 	github.com/go-sql-driver/mysql v1.4.1-0.20180618115901-749ddf1598b4
 	github.com/google/uuid v1.3.0 // indirect

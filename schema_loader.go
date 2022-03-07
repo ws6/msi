@@ -1,6 +1,8 @@
 package msi
 
 import (
+	"sync"
+
 	"github.com/mijia/modelq/drivers"
 )
 
@@ -9,7 +11,26 @@ import (
 //1. load tables and table columns definitions.
 //2. try to load foreign key associations
 
-var Loaders = map[string]ShemaLoader{}
+var RegisterLoader, GetLoader = func() (
+	func(string, ShemaLoader),
+	func(string) ShemaLoader,
+) {
+	loaders := make(map[string]ShemaLoader)
+	var lock = sync.Mutex{}
+	return func(name string, i ShemaLoader) {
+			lock.Lock()
+			loaders[name] = i
+			lock.Unlock()
+		}, func(name string) ShemaLoader {
+			lock.Lock()
+			found, ok := loaders[name]
+			lock.Unlock()
+			if ok {
+				return found
+			}
+			return nil
+		}
+}()
 
 type DbSchema drivers.DbSchema
 
