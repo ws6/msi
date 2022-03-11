@@ -21,10 +21,10 @@ var (
 )
 
 func IsDebug() bool {
-	return os.Getenv(`MSI_IsDebug()`) == `true`
+	return os.Getenv(`MSI_ISDEBUG`) == `true`
 }
 func UseLocal() bool {
-	return os.Getenv(`MSI_UseLocal()`) == `true`
+	return os.Getenv(`MSI_USELOCAL`) == `true`
 }
 
 type M map[string]interface{}
