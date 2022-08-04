@@ -128,6 +128,21 @@ var RegisterMsi, GetAllMsi = func() (func(*Msi), func() []*Msi) {
 		}
 }()
 
+func (self *Msi) ReloadAllTable() error {
+	loader := GetLoader(self.DriverName)
+	if loader == nil {
+		return fmt.Errorf(`no loader:%s`, self.DriverName)
+	}
+	self.Tables = []*Table{} //clean up otherwise it will dup
+	if err := loader.LoadDatabaseSchema(self); err != nil {
+		return fmt.Errorf(`LoadDatabaseSchema:%s`, err.Error())
+	}
+	if err := loader.LoadForeignKeys(self); err != nil {
+		return fmt.Errorf(`LoadForeignKeys:%s`, err.Error())
+	}
+	return nil
+}
+
 //NewDb loading all tables field definitions from database
 //NewDb(`mysql`, `rw_sage:Exxxc0ndid0@(ussd-prd-mysq01:3306)/sage`, `sage`,``)
 func NewDb(driver, dsnString, schema, tableNames string) (*Msi, error) {
