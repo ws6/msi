@@ -39,14 +39,16 @@ const (
 	NOT_EXISTS = `$null`   //if value is true then field is not null; else field is null
 	LIKE       = `$like`
 	//meta query constants
-	FIELDS       = `$fields`    // not part of SQL syntax; for overwritting the default field selection
-	JOINS        = `$joins`     // not part of SQL syntax
-	POPULATES    = `$populates` // not part of SQL syntax; accept array of strings; if each field has foreign fields specified will use other wise, use all foreign fields  ["field1:foreign_field1,foreign_field2", "field2" ]
+	FIELDS    = `$fields`    // not part of SQL syntax; for overwritting the default field selection
+	JOINS     = `$joins`     // not part of SQL syntax
+	POPULATES = `$populates` // not part of SQL syntax; accept array of strings; if each field has foreign fields specified will use other wise, use all foreign fields  ["field1:foreign_field1,foreign_field2", "field2" ]
+
 	OFFSET       = `$offset`
 	LIMIT        = `$limit`
 	GROUPBY      = `$groupby`
 	GROUPCOUNTBY = `$groupcountby`
 	SINCECOUNTBY = `$sincecountby`
+	OUTCOUNTBY   = `$outcountby`
 
 	ORDERBY = `$orderby`
 )
@@ -527,7 +529,7 @@ func ParseWhere(crit map[string]interface{}, ret *[]*Where, logicOp, compOp, fie
 		}
 		if where.FieldName == "" {
 			b, _ := json.Marshal(v)
-			err.Message = fmt.Sprintf(`no field name found at where [k=%s] %v ; IsArray(v) %s`, k, v, IsArray(v), string(b))
+			err.Message = fmt.Sprintf(`no field name found at where [k=%s] %v ; IsArray(%t) %s`, k, v, IsArray(v), string(b))
 
 			return
 		}
@@ -618,6 +620,7 @@ type MetaQuery struct {
 	Fields       []string
 	Joins        []string
 	Populates    []string
+	OutCountBy   []string
 }
 
 func InterfaceToStringArray(v interface{}) []string {
@@ -683,6 +686,8 @@ func ParseMetaQuery(crit map[string]interface{}) (*MetaQuery, error) {
 			//TODO support auto join $join:[{tablename:[selected_forgein_table_fields]}]
 		case POPULATES:
 			ret.Populates = InterfaceToStringArray(v)
+		case OUTCOUNTBY:
+			ret.OutCountBy = InterfaceToStringArray(v)
 		default:
 			continue
 		}

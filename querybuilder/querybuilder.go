@@ -61,6 +61,7 @@ type QueryParams struct {
 	GroupCountBy []string
 	SinceCountBy []string
 	Populates    []string //simple form for left join
+	OutCountBy   []string
 }
 
 func IsAtomicKinds(k reflect.Kind) bool {
@@ -372,7 +373,10 @@ func Build(c CanGet, fieldMap map[string]string) (*QueryParams, error) {
 	if groupCountBy := c.Get(`_populates`); groupCountBy != "" {
 		ret.Populates = strings.Split(groupCountBy, "|")
 	}
-
+	//TODO add _outcountby with three params, table, fk and group by key
+	if outCountBy := c.Get(`_outcountby`); outCountBy != "" {
+		ret.OutCountBy = strings.Split(outCountBy, "|")
+	}
 	if fields := c.Get(`_fields`); fields != "" {
 		fs := strings.Split(fields, ",")
 		ret.Fields = make(map[string]int)

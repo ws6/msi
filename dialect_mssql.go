@@ -102,6 +102,91 @@ func IsAggField(s string) bool {
 	return false
 }
 
+func (self *MSSQLLoader) CompileOutCountBy(t *Table, foreignTableName, foreignKeyField, groupByField string) (selectedFields []string, nonSelectClause string, orderby []string, limit int, offset int, err error) {
+	newTempTableName := fmt.Sprintf(`%s%s%s`, foreignTableName, foreignKeyField, groupByField) //unique
+	newCountFieldName := fmt.Sprintf(`%s.%s_count`, newTempTableName, groupByField)
+	selectedFields = append(selectedFields, newCountFieldName) //inject back
+	getCurrentTableRefKey := func() string {
+		for _, field := range t.Fields {
+			if field.ReferencedTable == nil {
+				continue
+			}
+			if field.ReferencedField == nil {
+				continue
+			}
+
+			if field.ReferencedTable.TableName == foreignTableName && field.ReferencedField.Name == foreignKeyField {
+				return field.Name
+			}
+
+		}
+		return ""
+	}
+
+	refKey := getCurrentTableRefKey()
+	if refKey == "" {
+		err = fmt.Errorf(`getCurrentTableRefKey is empty`)
+		return
+	}
+	nonSelectClause = fmt.Sprintf(`
+		left join (
+			select  [%s]  
+			,count([%s]) as [%s]  
+			from [%s] 
+			group by  [%s], [%s] 
+			
+		) [%s] on (  [%s].[%s] =  [%s].[%s] )
+	`,
+		foreignKeyField, //which key to join
+		groupByField,    //which key to count
+		newCountFieldName,
+		foreignTableName,
+
+		//!!!the order can not be changed
+		groupByField,    //which key to count
+		foreignKeyField, //which key to join
+
+		newTempTableName,
+		foreignTableName, foreignKeyField,
+		t.TableName, refKey,
+	)
+
+	return
+}
+
+func (self *MSSQLLoader) CompileAllOutCountBy(t *Table, mq *MetaQuery) (
+	selectedFields []string,
+	nonSelectClause []string,
+	orderby []string,
+	limit int, offset int,
+	err error,
+) {
+	if len(mq.OutCountBy) == 0 {
+		return
+	}
+	for _, oc := range mq.OutCountBy {
+		//process each item
+		params := strings.Split(oc, "__") //sep
+		if len(params) < 3 {
+			err = fmt.Errorf(`bad para %s for outcoutby`, oc)
+			return
+		}
+
+		foreignTableName, foreignKeyField, groupByField := params[0], params[1], params[2]
+		_selectFields, _nonSelectClause, _, _, _, _err := self.CompileOutCountBy(t, foreignTableName, foreignKeyField, groupByField)
+
+		if _err != nil {
+			err = _err
+			return
+		}
+		selectedFields = append(selectedFields, _selectFields...)
+		nonSelectClause = append(nonSelectClause, _nonSelectClause)
+
+	}
+
+	return
+}
+
 func (self *MSSQLLoader) find(t *Table, others ...map[string]interface{}) (selectedFields []string, nonSelectClause string, orderby []string, limit int, offset int, err error) {
 	for _, field := range t.Fields {
 		if field.Selected {
@@ -141,7 +226,7 @@ func (self *MSSQLLoader) find(t *Table, others ...map[string]interface{}) (selec
 
 	//if len(others) > 1 {
 	mq, _err := t.ParseMetaQuery(others[1])
-	if err != nil {
+	if _err != nil {
 		err = _err
 		return
 	}
@@ -238,6 +323,16 @@ func (self *MSSQLLoader) find(t *Table, others ...map[string]interface{}) (selec
 
 		nonSelectClause = fmt.Sprintf("%s  %s", nonSelectClause, strings.Join(leftjoins, " "))
 	}
+
+	_ocSelectFields, _ocNonSelectClause, _, _, _, ocErr := self.CompileAllOutCountBy(t, mq)
+	if ocErr != nil {
+		err = fmt.Errorf(`CompileAllOutCountBy:%s`, ocErr.Error())
+		return
+	}
+	if len(_ocSelectFields) > 0 {
+		selectedFields = append(selectedFields, _ocSelectFields...)
+	}
+	nonSelectClause = fmt.Sprintf("%s %s", nonSelectClause, strings.Join(_ocNonSelectClause, "\n"))
 
 	//install nonSelectClause
 	nonSelectClause = fmt.Sprintf("%s %s", nonSelectClause, whereClause)

@@ -93,6 +93,8 @@ func TestBuild(t *testing.T) {
 		`project_id64`: `$null`,
 		`project_id`:   `$null`,
 		`project_id2`:  `$exists`,
+		`_populates`:   `project_id|sample_id`,
+		`_outcountby`:  `sample__project_id__project_id|library__project_id__project_id`,
 	}
 	fm := map[string]string{
 		`okay`:         `string`,
