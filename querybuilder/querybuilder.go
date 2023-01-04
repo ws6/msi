@@ -336,7 +336,7 @@ func Build(c CanGet, fieldMap map[string]string, mu MapUpdater) (*QueryParams, e
 			outCountByFieldName := fmt.Sprintf(`%s__outcount`, f) //facilitate table typeMap
 			mu.SetExtraTypeMap(outCountByFieldName, `int64`)
 			fieldMap[outCountByFieldName] = `int64`
-			fmt.Println(`SetExtraTypeMap`, outCountByFieldName)
+
 		}
 
 	}

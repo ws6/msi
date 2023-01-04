@@ -47,7 +47,7 @@ func TestMsSqlOutCountBy(t *testing.T) {
 
 	table := sampleTable
 	//tests
-	testStr := `http://host.com:5432/path?_sortby=analysis_sample_id__sample_id__analysis_id__outcount&analysis_sample_id__sample_id__analysis_id__outcount=3&id=72707&_populates=project_id&_outcountby=analysis_sample_id__sample_id__sample_id|analysis_sample_id__sample_id__analysis_id`
+	testStr := `http://host.com:5432/path?id=72561&_sortby=analysis_sample_id__sample_id__analysis_id__outcount&id=72707&_populates=project_id&_outcountby=analysis_sample_id__sample_id__id|analysis_sample_id__sample_id__analysis_id`
 
 	u, err := url.Parse(testStr)
 	if err != nil {
