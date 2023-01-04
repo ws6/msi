@@ -2,11 +2,12 @@ package msi
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -102,6 +103,104 @@ func IsAggField(s string) bool {
 	return false
 }
 
+func (self *MSSQLLoader) CompileOutCountBy(t *Table, foreignTableName, foreignKeyField, groupByField string) (selectedFields []string, nonSelectClause string, orderby []string, limit int, offset int, err error) {
+	newTempTableName := fmt.Sprintf(`%s__%s__%s`, foreignTableName, foreignKeyField, groupByField) //unique
+	//TODO inject new field to typeMap
+	newCountFieldName := fmt.Sprintf(`%s__outcount`, newTempTableName)
+
+	selectedFields = append(selectedFields, newCountFieldName) //inject back
+	getCurrentTableRefKey := func() (*Field, error) {
+		foreignTable := t.Schema.GetTable(foreignTableName)
+
+		if foreignTable == nil {
+			return nil, fmt.Errorf(`no foreignTableName=%s`, foreignTableName)
+		}
+		// outCountTable:=
+		foreignKey := foreignTable.GetField(foreignKeyField)
+		if foreignKey == nil {
+			return nil, fmt.Errorf(`no foreignKey=%s`, foreignKey)
+		}
+
+		if foreignKey.ReferencedField == nil {
+			return nil, fmt.Errorf(`foreignKey.ReferencedField == nil`)
+		}
+		if foreignKey.ReferencedTable == nil {
+			return nil, fmt.Errorf(`foreignKey.ReferencedTable == nil`)
+		}
+		if foreignKey.ReferencedTable.TableName != t.TableName {
+			return nil, fmt.Errorf(`ReferencedTable has no ref to [%s]!=[%s] table`, foreignKey.ReferencedTable.TableName, t.TableName)
+		}
+		return foreignKey.ReferencedField, nil
+
+	}
+
+	refKey, err := getCurrentTableRefKey()
+	if err != nil {
+		log.Warn("no refkey for table=", foreignTableName, " field=", foreignKeyField)
+		err = fmt.Errorf(`getCurrentTableRefKey:%s`, err.Error())
+		return
+	}
+
+	nonSelectClause = fmt.Sprintf(`
+		left join (
+			select  [%s]  
+			,count(distinct [%s]) as [%s]  
+			from [%s] 
+			group by  [%s] 
+			
+		) [%s] on (  [%s].[%s] =  [%s].[%s] )
+	`,
+		foreignKeyField, //which key to join
+		groupByField,    //which key to count
+		newCountFieldName,
+		foreignTableName,
+
+		//!!!the order can not be changed
+		// groupByField,    //which key to count
+		foreignKeyField, //which key to join
+
+		newTempTableName,
+		newTempTableName, foreignKeyField,
+		t.TableName, refKey.Name,
+	)
+	//add to typeMap
+	t.SetExtraTypeMap(newCountFieldName, `int64`)
+	return
+}
+
+func (self *MSSQLLoader) CompileAllOutCountBy(t *Table, mq *MetaQuery) (
+	selectedFields []string,
+	nonSelectClause []string,
+	orderby []string,
+	limit int, offset int,
+	err error,
+) {
+	if len(mq.OutCountBy) == 0 {
+		return
+	}
+	for _, oc := range mq.OutCountBy {
+		//process each item
+		params := strings.Split(oc, "__") //sep
+		if len(params) < 3 {              //TODO adding where
+			err = fmt.Errorf(`bad para %s for outcoutby`, oc)
+			return
+		}
+
+		foreignTableName, foreignKeyField, groupByField := params[0], params[1], params[2]
+		_selectFields, _nonSelectClause, _, _, _, _err := self.CompileOutCountBy(t, foreignTableName, foreignKeyField, groupByField)
+
+		if _err != nil {
+			err = _err
+			return
+		}
+		selectedFields = append(selectedFields, _selectFields...)
+		nonSelectClause = append(nonSelectClause, _nonSelectClause)
+
+	}
+
+	return
+}
+
 func (self *MSSQLLoader) find(t *Table, others ...map[string]interface{}) (selectedFields []string, nonSelectClause string, orderby []string, limit int, offset int, err error) {
 	for _, field := range t.Fields {
 		if field.Selected {
@@ -141,7 +240,7 @@ func (self *MSSQLLoader) find(t *Table, others ...map[string]interface{}) (selec
 
 	//if len(others) > 1 {
 	mq, _err := t.ParseMetaQuery(others[1])
-	if err != nil {
+	if _err != nil {
 		err = _err
 		return
 	}
@@ -238,6 +337,16 @@ func (self *MSSQLLoader) find(t *Table, others ...map[string]interface{}) (selec
 
 		nonSelectClause = fmt.Sprintf("%s  %s", nonSelectClause, strings.Join(leftjoins, " "))
 	}
+
+	_ocSelectFields, _ocNonSelectClause, _, _, _, ocErr := self.CompileAllOutCountBy(t, mq)
+	if ocErr != nil {
+		err = fmt.Errorf(`CompileAllOutCountBy:%s`, ocErr.Error())
+		return
+	}
+	if len(_ocSelectFields) > 0 {
+		selectedFields = append(selectedFields, _ocSelectFields...)
+	}
+	nonSelectClause = fmt.Sprintf("%s %s", nonSelectClause, strings.Join(_ocNonSelectClause, "\n"))
 
 	//install nonSelectClause
 	nonSelectClause = fmt.Sprintf("%s %s", nonSelectClause, whereClause)
@@ -580,6 +689,7 @@ func (self *MSSQLLoader) SafeWhere(t *Table, crit map[string]interface{}) (strin
 		}
 		return false
 	}
+	typeMap := t.GetTypeMap()
 	for _, where := range _wheres {
 
 		if where.Protected {
@@ -592,7 +702,10 @@ func (self *MSSQLLoader) SafeWhere(t *Table, crit map[string]interface{}) (strin
 			wheres = append(wheres, where)
 			continue
 		}
-
+		if _, ok := typeMap[where.FieldName]; ok {
+			wheres = append(wheres, where)
+			continue
+		}
 		where.FieldName = fmt.Sprintf(`[%s].[%s]`, t.TableName, where.FieldName)
 
 		for _, field := range t.Fields {
@@ -604,6 +717,7 @@ func (self *MSSQLLoader) SafeWhere(t *Table, crit map[string]interface{}) (strin
 			}
 
 		}
+		log.Info("where is not accepted ==>", where)
 	}
 
 	whereClause := fmt.Sprintf(`WHERE 1=1  %s`, ToWhereString(t, wheres))

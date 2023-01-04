@@ -61,6 +61,7 @@ type QueryParams struct {
 	GroupCountBy []string
 	SinceCountBy []string
 	Populates    []string //simple form for left join
+	OutCountBy   []string //added 2023, counting how many refereces rows from fk table
 }
 
 func IsAtomicKinds(k reflect.Kind) bool {
@@ -316,11 +317,28 @@ func BuildAllParams(params map[string]string, fieldMap map[string]string) (map[s
 type CanGet interface {
 	Get(string) string
 }
+type MapUpdater interface {
+	SetExtraTypeMap(string, string)
+}
 
-func Build(c CanGet, fieldMap map[string]string) (*QueryParams, error) {
+func Build(c CanGet, fieldMap map[string]string, mu MapUpdater) (*QueryParams, error) {
 	ret := &QueryParams{
 		Limit:  30,
 		Fields: make(map[string]int),
+	}
+
+	//TODO add _outcountby with three params, table, fk and group by key
+	if outCountBy := c.Get(`_outcountby`); outCountBy != "" {
+		ret.OutCountBy = strings.Split(outCountBy, "|")
+		//inject typeMap
+
+		for _, f := range ret.OutCountBy {
+			outCountByFieldName := fmt.Sprintf(`%s__outcount`, f) //facilitate table typeMap
+			mu.SetExtraTypeMap(outCountByFieldName, `int64`)
+			fieldMap[outCountByFieldName] = `int64`
+
+		}
+
 	}
 
 	critMap := make(map[string]string)
