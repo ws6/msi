@@ -1,5 +1,6 @@
 package msi
 
+//tabledb.go facilitate most popular web-ui pagenationable queries
 import (
 	"context"
 	"database/sql"

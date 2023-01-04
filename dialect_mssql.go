@@ -2,11 +2,12 @@ package msi
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -103,37 +104,49 @@ func IsAggField(s string) bool {
 }
 
 func (self *MSSQLLoader) CompileOutCountBy(t *Table, foreignTableName, foreignKeyField, groupByField string) (selectedFields []string, nonSelectClause string, orderby []string, limit int, offset int, err error) {
-	newTempTableName := fmt.Sprintf(`%s%s%s`, foreignTableName, foreignKeyField, groupByField) //unique
-	newCountFieldName := fmt.Sprintf(`%s.%s_count`, newTempTableName, groupByField)
+	newTempTableName := fmt.Sprintf(`%s__%s__%s`, foreignTableName, foreignKeyField, groupByField) //unique
+	//TODO inject new field to typeMap
+	newCountFieldName := fmt.Sprintf(`%s__outcount`, newTempTableName)
+
 	selectedFields = append(selectedFields, newCountFieldName) //inject back
-	getCurrentTableRefKey := func() string {
-		for _, field := range t.Fields {
-			if field.ReferencedTable == nil {
-				continue
-			}
-			if field.ReferencedField == nil {
-				continue
-			}
+	getCurrentTableRefKey := func() (*Field, error) {
+		foreignTable := t.Schema.GetTable(foreignTableName)
 
-			if field.ReferencedTable.TableName == foreignTableName && field.ReferencedField.Name == foreignKeyField {
-				return field.Name
-			}
-
+		if foreignTable == nil {
+			return nil, fmt.Errorf(`no foreignTableName=%s`, foreignTableName)
 		}
-		return ""
+		// outCountTable:=
+		foreignKey := foreignTable.GetField(foreignKeyField)
+		if foreignKey == nil {
+			return nil, fmt.Errorf(`no foreignKey=%s`, foreignKey)
+		}
+
+		if foreignKey.ReferencedField == nil {
+			return nil, fmt.Errorf(`foreignKey.ReferencedField == nil`)
+		}
+		if foreignKey.ReferencedTable == nil {
+			return nil, fmt.Errorf(`foreignKey.ReferencedTable == nil`)
+		}
+		if foreignKey.ReferencedTable.TableName != t.TableName {
+			return nil, fmt.Errorf(`ReferencedTable has no ref to [%s]!=[%s] table`, foreignKey.ReferencedTable.TableName, t.TableName)
+		}
+		return foreignKey.ReferencedField, nil
+
 	}
 
-	refKey := getCurrentTableRefKey()
-	if refKey == "" {
-		err = fmt.Errorf(`getCurrentTableRefKey is empty`)
+	refKey, err := getCurrentTableRefKey()
+	if err != nil {
+		log.Warn("no refkey for table=", foreignTableName, " field=", foreignKeyField)
+		err = fmt.Errorf(`getCurrentTableRefKey:%s`, err.Error())
 		return
 	}
+
 	nonSelectClause = fmt.Sprintf(`
 		left join (
 			select  [%s]  
-			,count([%s]) as [%s]  
+			,count(distinct [%s]) as [%s]  
 			from [%s] 
-			group by  [%s], [%s] 
+			group by  [%s] 
 			
 		) [%s] on (  [%s].[%s] =  [%s].[%s] )
 	`,
@@ -143,14 +156,15 @@ func (self *MSSQLLoader) CompileOutCountBy(t *Table, foreignTableName, foreignKe
 		foreignTableName,
 
 		//!!!the order can not be changed
-		groupByField,    //which key to count
+		// groupByField,    //which key to count
 		foreignKeyField, //which key to join
 
 		newTempTableName,
-		foreignTableName, foreignKeyField,
-		t.TableName, refKey,
+		newTempTableName, foreignKeyField,
+		t.TableName, refKey.Name,
 	)
-
+	//add to typeMap
+	t.SetExtraTypeMap(newCountFieldName, `int64`)
 	return
 }
 
@@ -167,7 +181,7 @@ func (self *MSSQLLoader) CompileAllOutCountBy(t *Table, mq *MetaQuery) (
 	for _, oc := range mq.OutCountBy {
 		//process each item
 		params := strings.Split(oc, "__") //sep
-		if len(params) < 3 {
+		if len(params) < 3 {              //TODO adding where
 			err = fmt.Errorf(`bad para %s for outcoutby`, oc)
 			return
 		}
@@ -675,6 +689,7 @@ func (self *MSSQLLoader) SafeWhere(t *Table, crit map[string]interface{}) (strin
 		}
 		return false
 	}
+	typeMap := t.GetTypeMap()
 	for _, where := range _wheres {
 
 		if where.Protected {
@@ -687,7 +702,10 @@ func (self *MSSQLLoader) SafeWhere(t *Table, crit map[string]interface{}) (strin
 			wheres = append(wheres, where)
 			continue
 		}
-
+		if _, ok := typeMap[where.FieldName]; ok {
+			wheres = append(wheres, where)
+			continue
+		}
 		where.FieldName = fmt.Sprintf(`[%s].[%s]`, t.TableName, where.FieldName)
 
 		for _, field := range t.Fields {
@@ -699,6 +717,7 @@ func (self *MSSQLLoader) SafeWhere(t *Table, crit map[string]interface{}) (strin
 			}
 
 		}
+		log.Info("where is not accepted ==>", where)
 	}
 
 	whereClause := fmt.Sprintf(`WHERE 1=1  %s`, ToWhereString(t, wheres))

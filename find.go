@@ -75,6 +75,8 @@ func IsMetaQuery(op string) bool {
 		return true
 	case POPULATES:
 		return true
+	case OUTCOUNTBY:
+		return true
 	}
 	return false
 }
@@ -688,6 +690,7 @@ func ParseMetaQuery(crit map[string]interface{}) (*MetaQuery, error) {
 			ret.Populates = InterfaceToStringArray(v)
 		case OUTCOUNTBY:
 			ret.OutCountBy = InterfaceToStringArray(v)
+
 		default:
 			continue
 		}

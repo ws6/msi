@@ -61,6 +61,7 @@ type Table struct {
 	Fields    []*Field
 
 	unsafeFieldsPatterns []*pattern
+	extraFieldTypeMap    map[string]string
 }
 
 func IsNumber(t string) bool {
@@ -77,6 +78,16 @@ func IsNumber(t string) bool {
 
 func (t *Table) SelectAll() {
 	t.SelectAllFields()
+}
+
+func (t *Table) SetExtraTypeMap(k, v string) {
+	if t.extraFieldTypeMap == nil {
+		t.extraFieldTypeMap = make(map[string]string)
+	}
+	if _, ok := t.extraFieldTypeMap[k]; !ok {
+		t.extraFieldTypeMap[k] = v
+	}
+
 }
 
 func (t *Table) _select(s bool, fields ...string) {
@@ -175,6 +186,7 @@ func (t *Table) MakeInsertValues(updates []*NameVal) []string {
 	return ret
 }
 func (t *Table) GetTypeMap() map[string]string {
+
 	prim := t.GetPrimTypeMap()
 
 	fkMap := t.GetForeignTableMap()
@@ -182,7 +194,14 @@ func (t *Table) GetTypeMap() map[string]string {
 	for k, v := range fkMap {
 		prim[k] = v
 	}
-
+	if t.extraFieldTypeMap == nil {
+		t.extraFieldTypeMap = make(map[string]string)
+	}
+	if t.extraFieldTypeMap != nil {
+		for k, v := range t.extraFieldTypeMap {
+			prim[k] = v
+		}
+	}
 	return prim
 }
 
