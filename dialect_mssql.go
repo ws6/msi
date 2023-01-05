@@ -228,16 +228,6 @@ func (self *MSSQLLoader) find(t *Table, others ...map[string]interface{}) (selec
 		crit = others[0]
 	}
 
-	whereClause, _err := self.SafeWhere(t, crit)
-	if _err != nil {
-		err = _err
-		return
-	}
-	if len(others) == 1 {
-		nonSelectClause = fmt.Sprintf(`%s %s `, nonSelectClause, whereClause)
-		return
-	}
-
 	//if len(others) > 1 {
 	mq, _err := t.ParseMetaQuery(others[1])
 	if _err != nil {
@@ -338,6 +328,17 @@ func (self *MSSQLLoader) find(t *Table, others ...map[string]interface{}) (selec
 		nonSelectClause = fmt.Sprintf("%s  %s", nonSelectClause, strings.Join(leftjoins, " "))
 	}
 
+	if len(mq.Populates2) > 0 {
+		_selectedFields, _joins, _, _err := self.CompileAllPopulates2(t, mq.Populates2)
+		if _err != nil {
+			err = fmt.Errorf(`CompileAllPopulates2:%s`, _err.Error())
+			return
+		}
+		selectedFields = append(selectedFields, _selectedFields...)
+
+		nonSelectClause = fmt.Sprintf("%s %s", nonSelectClause, strings.Join(_joins, "\n"))
+	}
+
 	_ocSelectFields, _ocNonSelectClause, _, _, _, ocErr := self.CompileAllOutCountBy(t, mq)
 	if ocErr != nil {
 		err = fmt.Errorf(`CompileAllOutCountBy:%s`, ocErr.Error())
@@ -347,7 +348,15 @@ func (self *MSSQLLoader) find(t *Table, others ...map[string]interface{}) (selec
 		selectedFields = append(selectedFields, _ocSelectFields...)
 	}
 	nonSelectClause = fmt.Sprintf("%s %s", nonSelectClause, strings.Join(_ocNonSelectClause, "\n"))
-
+	whereClause, _err := self.SafeWhere(t, crit)
+	if _err != nil {
+		err = _err
+		return
+	}
+	if len(others) == 1 {
+		nonSelectClause = fmt.Sprintf(`%s %s `, nonSelectClause, whereClause)
+		return
+	}
 	//install nonSelectClause
 	nonSelectClause = fmt.Sprintf("%s %s", nonSelectClause, whereClause)
 

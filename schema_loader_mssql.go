@@ -1,9 +1,11 @@
 package msi
 
 import (
+	"context"
 	"fmt"
-	"log"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/mijia/modelq/drivers"
 )
@@ -164,6 +166,40 @@ func (self *MSSQLLoader) SetVersion(db *Msi) error {
 
 }
 
+func (self *MSSQLLoader) GetPrimaryKeys(db *Msi) ([][2]string, error) {
+	query := fmt.Sprintf(`
+		 SELECT
+    k.TABLE_NAME  
+   , k.COLUMN_NAME  
+ , ic.CONSTRAINT_TYPE
+FROM   INFORMATION_SCHEMA.KEY_COLUMN_USAGE k  
+join INFORMATION_SCHEMA.TABLE_CONSTRAINTS ic on ic.TABLE_NAME = k.TABLE_NAME and ic.CONSTRAINT_NAME = k.CONSTRAINT_NAME and ic.CONSTRAINT_SCHEMA = k.CONSTRAINT_SCHEMA and ic.CONSTRAINT_CATALOG = k.CONSTRAINT_CATALOG
+ where  1=1 
+ and ic.CONSTRAINT_TYPE = 'PRIMARY KEY'
+and  ic.TABLE_SCHEMA ='%s'
+	`, db.Schema,
+	)
+
+	founds, err := db.MapContext(context.Background(), db.Db, query, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	ret := [][2]string{}
+	for _, found := range founds {
+		tableName, _ := ToString(found[`TABLE_NAME`])
+		fieldName, _ := ToString(found[`COLUMN_NAME`])
+
+		toadd := [2]string{
+			tableName, fieldName,
+		}
+
+		ret = append(ret, toadd)
+	}
+
+	return ret, nil
+}
+
 func (self *MSSQLLoader) getTableColumns(tableName string, table *Table, columns []map[string]interface{}) ([]*Field, error) {
 
 	ret := []*Field{}
@@ -196,7 +232,11 @@ func (self *MSSQLLoader) getTableColumns(tableName string, table *Table, columns
 }
 
 func (self *MSSQLLoader) LoadDatabaseSchema(db *Msi) error {
-
+	db.Schema = `dbo`
+	sp := strings.Split(db.DatabaseName, ".")
+	if len(sp) > 1 {
+		db.Schema = sp[0] //assume the first section is schema for mssql
+	}
 	// if err := self.SetVersion(db); err != nil {
 	// 	return err
 	// }
@@ -244,7 +284,36 @@ WHERE schema_id = SCHEMA_ID('dbo')
 		if err != nil {
 			return err
 		}
+
 		db.Tables = append(db.Tables, table)
+	}
+	pks, err := self.GetPrimaryKeys(db)
+	if err != nil {
+		return fmt.Errorf(`GetPrimaryKeys:%s`, err.Error())
+	}
+
+	//install PKs
+	getField := func(tableName, fieldName string) *Field {
+		for _, t := range db.Tables {
+			if t.TableName != tableName {
+				continue
+			}
+			for _, f := range t.Fields {
+				if f.Name == fieldName {
+					return f
+				}
+			}
+		}
+		return nil
+	}
+	cnt := 0
+	for _, pk := range pks {
+		foundPKfield := getField(pk[0], pk[1])
+		if foundPKfield == nil {
+			continue
+		}
+		foundPKfield.IsPrimaryKey = true
+		cnt++
 	}
 
 	return nil

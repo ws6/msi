@@ -3,6 +3,7 @@ package msi
 import (
 	"fmt"
 	"strings"
+	"sync"
 )
 
 const DEFAULT_LIMIT = 30
@@ -60,8 +61,9 @@ type Table struct {
 	JoinAlias string //used when join queries envoled; for use space
 	Fields    []*Field
 
-	unsafeFieldsPatterns []*pattern
-	extraFieldTypeMap    map[string]string
+	unsafeFieldsPatterns   []*pattern
+	extraFieldTypeMap      map[string]string
+	_extraFieldTypeMapLock sync.Mutex
 }
 
 func IsNumber(t string) bool {
@@ -76,11 +78,27 @@ func IsNumber(t string) bool {
 
 }
 
+func (t *Table) GetMsi() *Msi {
+	return t.Schema
+}
+
+func (t *Table) GetFirstPrimaryKey() *Field {
+	for _, f := range t.Fields {
+		if f.IsPrimaryKey {
+			return f
+		}
+	}
+
+	return nil
+}
+
 func (t *Table) SelectAll() {
 	t.SelectAllFields()
 }
 
 func (t *Table) SetExtraTypeMap(k, v string) {
+	t._extraFieldTypeMapLock.Lock()
+	defer t._extraFieldTypeMapLock.Unlock()
 	if t.extraFieldTypeMap == nil {
 		t.extraFieldTypeMap = make(map[string]string)
 	}
