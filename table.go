@@ -96,6 +96,21 @@ func (t *Table) SelectAll() {
 	t.SelectAllFields()
 }
 
+//GetTable for meet querybuilder interface
+func (t *Table) GetTable() *Table {
+	return t
+}
+
+//GetLoader for meet querybuilder interface
+func (t *Table) GetLoader() ShemaLoader {
+	return t.GetMsi().GetLoader()
+}
+
+//SetTypeMap rename from SetExtraTypeMap for querybuilder better naming
+func (t *Table) SetTypeMap(k, v string) {
+	t.SetExtraTypeMap(k, v)
+	return
+}
 func (t *Table) SetExtraTypeMap(k, v string) {
 	t._extraFieldTypeMapLock.Lock()
 	defer t._extraFieldTypeMapLock.Unlock()

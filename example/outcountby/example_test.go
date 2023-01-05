@@ -47,7 +47,7 @@ func TestMsSqlOutCountBy(t *testing.T) {
 
 	table := sampleTable
 	//tests
-	testStr := `http://host.com:5432/path?_outcountby=analysis_sample_id__sample_id__id&_sortby=t2__user_created__is_ro desc&t0__project_id__name=covidseqtest&_populates=user_created&_populates2=project_id->customer_id->user_created:t0__project_id__name,t1__customer_id__name|user_created:t0__user_created__name`
+	testStr := `http://host.com:5432/path?id=72561&_sortby=analysis_sample_id__sample_id__analysis_id__outcount&id=72707&_populates=project_id&_outcountby=analysis_sample_id__sample_id__id|analysis_sample_id__sample_id__analysis_id`
 
 	u, err := url.Parse(testStr)
 	if err != nil {
@@ -57,68 +57,48 @@ func TestMsSqlOutCountBy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	// table.GetTypeMap()
+	for _, f := range table.Fields {
+		if f.IsPrimaryKey {
+			t.Log(`found primary key`, f)
+
+		}
+	}
+
+	t.Log(`OutCountBy`, q.Get(`_outcountby`))
+	// table.SetExtraTypeMap(`analysis_sample_id__sample_id__analysis_id__outcount`, `int64`)
+	fieldMap := table.GetTypeMap()
+
+	if true {
+		body, _ := json.MarshalIndent(fieldMap, "", "  ")
+		t.Log(string(body))
+	}
 	qb, err := querybuilder.Build(q, table)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
+	if false {
+		body, _ := json.MarshalIndent(qb, "", "  ")
+		t.Log(string(body))
+	}
 
 	if true {
-		t.Logf("qb.Populates2====>  %+v\n", qb.Populates2)
-		t.Logf("qb.Critiera====>  %+v\n", qb.Critiera)
+		t.Logf("qb.OutCountBy====>  %+v\n", qb.OutCountBy)
+		t.Logf("qb.Populates====>  %+v\n", qb.Populates)
 	}
 
-	ms := new(msi.MSSQLLoader)
-
-	// nextTable *Table, //the fk table key is using
-	// newTempTableName string,
-	// newPKName string,
-	// selectedFields []string,
-	// nonSelectClause string,
-	// err error,
-	if false {
-		_, newTempTableName, newPKName, _, nonSelectClause, _, err := ms.CompilePopulates2(
-			table,        //current table
-			`project_id`, //key
-			1,            //order
-			"", "",       //pre table, pre pk
-			nil, //allow fields
-		)
-		if err != nil {
-			t.Fatal(err.Error())
-		}
-		t.Log(newTempTableName)
-		t.Log(newPKName)
-		t.Log(nonSelectClause)
-	}
-
-	if false {
-		mq := new(msi.MetaQuery)
-		mq.Populates2 = qb.Populates2
-		_, joins, _, err := ms.CompileAllPopulates2(table, mq.Populates2)
-		if err != nil {
-			t.Fatal(err.Error())
-		}
-
-		for _, join := range joins {
-			t.Log(join)
-		}
-
-		return
-	}
 	crit := qb.Critiera
-	db.GetTable(`user`).GetField(`session_id`).Hide = true
-	db.GetTable(`user`).GetField(`password_md5`).Hide = true
-	t.Log(`password_md5 type==>`, db.GetTable(`user`).GetField(`password_md5`).Type)
+	if true {
+		body, _ := json.MarshalIndent(crit, "", "  ")
+		t.Log(`qb.Critiera====>`, string(body))
+	}
 	others := []map[string]interface{}{crit}
 
 	metaQuery := map[string]interface{}{
-		msi.LIMIT:        1, // qb.Limit,
+		msi.LIMIT:        qb.Limit,
 		msi.OFFSET:       qb.Skip,
 		msi.ORDERBY:      qb.SortBy,
 		msi.GROUPBY:      qb.GroupBy,
 		msi.POPULATES:    qb.Populates,
-		msi.POPULATES2:   qb.Populates2,
 		msi.GROUPCOUNTBY: qb.GroupCountBy,
 		msi.SINCECOUNTBY: qb.SinceCountBy,
 		msi.OUTCOUNTBY:   qb.OutCountBy,

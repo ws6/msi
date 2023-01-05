@@ -320,11 +320,20 @@ func BuildAllParams(params map[string]string, fieldMap map[string]string) (map[s
 type CanGet interface {
 	Get(string) string
 }
+
+//MapUpdater interface for key/value operations
 type MapUpdater interface {
-	SetExtraTypeMap(string, string)
-	GetMsi() *msi.Msi
+	SetTypeMap(string, string)
+	GetTypeMap() map[string]string
 }
 
+//TableLoader interface for connect MapUpdater and CanPopulate2
+type TableLoader interface {
+	GetTable() *msi.Table
+	GetLoader() msi.ShemaLoader
+}
+
+//CanPopulate2 interface can build special feature -CanPopulate2
 type CanPopulate2 interface {
 	CompileAllPopulates2(t *msi.Table, populates2 []string) (
 		selectedFields []string,
@@ -334,65 +343,64 @@ type CanPopulate2 interface {
 	)
 }
 
-func Build(c CanGet, fieldMap map[string]string, mu MapUpdater, loader msi.ShemaLoader) (*QueryParams, error) {
+func (self *QueryParams) BuildOutcountBy(outCountBy string, mu MapUpdater) error {
+	self.OutCountBy = strings.Split(outCountBy, "|")
+	//inject typeMap
+
+	for _, f := range self.OutCountBy {
+		outCountByFieldName := fmt.Sprintf(`%s__outcount`, f) //facilitate table typeMap
+		mu.SetTypeMap(outCountByFieldName, `int64`)
+	}
+	return nil
+}
+func (self *QueryParams) BuildPopulate2(populate2 string, mu MapUpdater) error {
+
+	self.Populates2 = strings.Split(populate2, "|")
+
+	tu, ok := mu.(TableLoader)
+	if !ok {
+		fmt.Println(`!!!not TableLoader`)
+		return nil
+	}
+	loader := tu.GetLoader()
+	if loader == nil {
+		return fmt.Errorf(`loader is empty`)
+	}
+	p2, ok := loader.(CanPopulate2)
+	if !ok {
+		fmt.Println(`!!!not CanPopulate2`)
+		return nil
+	}
+	_, _, typeMap, err := p2.CompileAllPopulates2(tu.GetTable(), self.Populates2)
+	if err != nil {
+		return err
+	}
+	fmt.Println(`-------------CompileAllPopulates2  typeMap`, len(typeMap))
+	for k, v := range typeMap {
+		mu.SetTypeMap(k, v)
+	}
+	return nil
+}
+
+func Build(c CanGet, mu MapUpdater) (*QueryParams, error) {
 	ret := &QueryParams{
 		Limit:  30,
 		Fields: make(map[string]int),
 	}
-
-	//TODO add _outcountby with three params, table, fk and group by key
-	if outCountBy := c.Get(`_outcountby`); outCountBy != "" {
-		ret.OutCountBy = strings.Split(outCountBy, "|")
-		//inject typeMap
-
-		for _, f := range ret.OutCountBy {
-			outCountByFieldName := fmt.Sprintf(`%s__outcount`, f) //facilitate table typeMap
-			mu.SetExtraTypeMap(outCountByFieldName, `int64`)
-			fieldMap[outCountByFieldName] = `int64`
-
-		}
-
-	}
-
-	if groupCountBy := c.Get(`_populates2`); groupCountBy != "" {
-		ret.Populates2 = strings.Split(groupCountBy, "|")
-		db := mu.GetMsi()
-		if db != nil {
-			if table, ok2 := mu.(*msi.Table); ok2 {
-
-				if p2, ok3 := loader.(CanPopulate2); ok3 {
-					_, _, typeMap, err := p2.CompileAllPopulates2(table, ret.Populates2)
-					if err != nil {
-						return nil, fmt.Errorf(`CompileAllPopulates2:%s`, err.Error())
-					}
-
-					for k, v := range typeMap {
-						fieldMap[k] = v
-					}
-				}
-
-			}
-
-		}
-
-	}
-
-	critMap := make(map[string]string)
-	for k, _ := range fieldMap {
-		ck := c.Get(k)
-		if ck == "" {
-			continue
-		}
-
-		critMap[k] = ck
-	}
-
 	var err error
 
-	ret.Critiera, err = BuildAllParams(critMap, fieldMap)
-	if err != nil {
-		return nil, err
+	if outCountBy := c.Get(`_outcountby`); outCountBy != "" {
+		if err := ret.BuildOutcountBy(outCountBy, mu); err != nil {
+			return nil, fmt.Errorf(`BuildOutcountBy:%s`, err.Error())
+		}
 	}
+
+	if populate2 := c.Get(`_populates2`); populate2 != "" {
+		if err := ret.BuildPopulate2(populate2, mu); err != nil {
+			return nil, fmt.Errorf(`BuildPopulate2:%s`, err.Error())
+		}
+	}
+
 	if limit := c.Get(`_limit`); limit != "" {
 		ret.Limit, err = strconv.Atoi(limit)
 		if err != nil {
@@ -427,28 +435,51 @@ func Build(c CanGet, fieldMap map[string]string, mu MapUpdater, loader msi.Shema
 		ret.Populates = strings.Split(groupCountBy, "|")
 	}
 
-	if fields := c.Get(`_fields`); fields != "" {
-		fs := strings.Split(fields, ",")
-		ret.Fields = make(map[string]int)
-		for _, f := range fs {
-			if _, ok := fieldMap[f]; !ok {
-				return nil, fmt.Errorf(`%s is not in allowed field type map `, f)
-			}
-			ret.Fields[f] = 1
+	//building Crit at last because typeMap are still get updatting
+	if true {
+
+		critMap := make(map[string]string)
+		fieldMap := mu.GetTypeMap()
+
+		for k, v := range fieldMap {
+			fmt.Println(k, v)
 		}
 
-		//default to supress all sub document
-
-		if err != nil {
-			return nil, fmt.Errorf(`parse fields error ` + err.Error())
-		}
-	}
-	if len(ret.Fields) == 0 {
 		for k, _ := range fieldMap {
-			ret.Fields[k] = 1
+			ck := c.Get(k)
+			if ck == "" {
+				continue
+			}
+
+			critMap[k] = ck
+		}
+
+		ret.Critiera, err = BuildAllParams(critMap, fieldMap)
+		if err != nil {
+			return nil, err
+		}
+
+		if fields := c.Get(`_fields`); fields != "" {
+			fs := strings.Split(fields, ",")
+			ret.Fields = make(map[string]int)
+			for _, f := range fs {
+				if _, ok := fieldMap[f]; !ok {
+					return nil, fmt.Errorf(`%s is not in allowed field type map `, f)
+				}
+				ret.Fields[f] = 1
+			}
+
+			//default to supress all sub document
+
+			if err != nil {
+				return nil, fmt.Errorf(`parse fields error ` + err.Error())
+			}
+		}
+		if len(ret.Fields) == 0 {
+			for k, _ := range fieldMap {
+				ret.Fields[k] = 1
+			}
 		}
 	}
-	//	b, _ := json.MarshalIndent(ret, "", "    ")
-
 	return ret, nil
 }
