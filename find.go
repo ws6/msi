@@ -39,9 +39,10 @@ const (
 	NOT_EXISTS = `$null`   //if value is true then field is not null; else field is null
 	LIKE       = `$like`
 	//meta query constants
-	FIELDS    = `$fields`    // not part of SQL syntax; for overwritting the default field selection
-	JOINS     = `$joins`     // not part of SQL syntax
-	POPULATES = `$populates` // not part of SQL syntax; accept array of strings; if each field has foreign fields specified will use other wise, use all foreign fields  ["field1:foreign_field1,foreign_field2", "field2" ]
+	FIELDS     = `$fields`     // not part of SQL syntax; for overwritting the default field selection
+	JOINS      = `$joins`      // not part of SQL syntax
+	POPULATES  = `$populates`  // not part of SQL syntax; accept array of strings; if each field has foreign fields specified will use other wise, use all foreign fields  ["field1:foreign_field1,foreign_field2", "field2" ]
+	POPULATES2 = `$populates2` // version 2 of populates can support multiple level of outter one-to-one join
 
 	OFFSET       = `$offset`
 	LIMIT        = `$limit`
@@ -74,6 +75,8 @@ func IsMetaQuery(op string) bool {
 	case JOINS:
 		return true
 	case POPULATES:
+		return true
+	case POPULATES2:
 		return true
 	case OUTCOUNTBY:
 		return true
@@ -622,6 +625,7 @@ type MetaQuery struct {
 	Fields       []string
 	Joins        []string
 	Populates    []string
+	Populates2   []string
 	OutCountBy   []string
 }
 
@@ -688,6 +692,8 @@ func ParseMetaQuery(crit map[string]interface{}) (*MetaQuery, error) {
 			//TODO support auto join $join:[{tablename:[selected_forgein_table_fields]}]
 		case POPULATES:
 			ret.Populates = InterfaceToStringArray(v)
+		case POPULATES2:
+			ret.Populates2 = InterfaceToStringArray(v)
 		case OUTCOUNTBY:
 			ret.OutCountBy = InterfaceToStringArray(v)
 

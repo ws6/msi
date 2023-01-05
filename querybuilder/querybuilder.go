@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ws6/msi"
 )
 
 var (
@@ -61,6 +63,7 @@ type QueryParams struct {
 	GroupCountBy []string
 	SinceCountBy []string
 	Populates    []string //simple form for left join
+	Populates2   []string //verision 2 of populates
 	OutCountBy   []string //added 2023, counting how many refereces rows from fk table
 }
 
@@ -319,9 +322,19 @@ type CanGet interface {
 }
 type MapUpdater interface {
 	SetExtraTypeMap(string, string)
+	GetMsi() *msi.Msi
 }
 
-func Build(c CanGet, fieldMap map[string]string, mu MapUpdater) (*QueryParams, error) {
+type CanPopulate2 interface {
+	CompileAllPopulates2(t *msi.Table, populates2 []string) (
+		selectedFields []string,
+		nonSelectClause []string,
+		typeMap map[string]string,
+		err error,
+	)
+}
+
+func Build(c CanGet, fieldMap map[string]string, mu MapUpdater, loader msi.ShemaLoader) (*QueryParams, error) {
 	ret := &QueryParams{
 		Limit:  30,
 		Fields: make(map[string]int),
@@ -336,6 +349,29 @@ func Build(c CanGet, fieldMap map[string]string, mu MapUpdater) (*QueryParams, e
 			outCountByFieldName := fmt.Sprintf(`%s__outcount`, f) //facilitate table typeMap
 			mu.SetExtraTypeMap(outCountByFieldName, `int64`)
 			fieldMap[outCountByFieldName] = `int64`
+
+		}
+
+	}
+
+	if groupCountBy := c.Get(`_populates2`); groupCountBy != "" {
+		ret.Populates2 = strings.Split(groupCountBy, "|")
+		db := mu.GetMsi()
+		if db != nil {
+			if table, ok2 := mu.(*msi.Table); ok2 {
+
+				if p2, ok3 := loader.(CanPopulate2); ok3 {
+					_, _, typeMap, err := p2.CompileAllPopulates2(table, ret.Populates2)
+					if err != nil {
+						return nil, fmt.Errorf(`CompileAllPopulates2:%s`, err.Error())
+					}
+
+					for k, v := range typeMap {
+						fieldMap[k] = v
+					}
+				}
+
+			}
 
 		}
 
