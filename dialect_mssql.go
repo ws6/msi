@@ -227,14 +227,15 @@ func (self *MSSQLLoader) find(t *Table, others ...map[string]interface{}) (selec
 	if len(others) > 0 {
 		crit = others[0]
 	}
-
-	//if len(others) > 1 {
-	mq, _err := t.ParseMetaQuery(others[1])
-	if _err != nil {
-		err = _err
-		return
+	mq := new(MetaQuery)
+	if len(others) > 1 {
+		_mq, _err := t.ParseMetaQuery(others[1])
+		if _err != nil {
+			err = _err
+			return
+		}
+		mq = _mq
 	}
-
 	if len(mq.Fields) > 0 {
 		selectedFields = mq.Fields //!!!overwrite
 	}

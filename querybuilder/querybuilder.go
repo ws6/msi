@@ -375,7 +375,7 @@ func (self *QueryParams) BuildPopulate2(populate2 string, mu MapUpdater) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(`-------------CompileAllPopulates2  typeMap`, len(typeMap))
+
 	for k, v := range typeMap {
 		mu.SetTypeMap(k, v)
 	}
@@ -440,10 +440,6 @@ func Build(c CanGet, mu MapUpdater) (*QueryParams, error) {
 
 		critMap := make(map[string]string)
 		fieldMap := mu.GetTypeMap()
-
-		for k, v := range fieldMap {
-			fmt.Println(k, v)
-		}
 
 		for k, _ := range fieldMap {
 			ck := c.Get(k)
