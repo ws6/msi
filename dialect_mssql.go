@@ -703,6 +703,7 @@ func (self *MSSQLLoader) SafeWhere(t *Table, crit map[string]interface{}) (strin
 	for _, where := range _wheres {
 
 		if where.Protected {
+
 			wheres = append(wheres, where)
 			continue
 		}
@@ -713,6 +714,10 @@ func (self *MSSQLLoader) SafeWhere(t *Table, crit map[string]interface{}) (strin
 			continue
 		}
 		if _, ok := typeMap[where.FieldName]; ok {
+
+			if t.GetField(where.FieldName) != nil { //this field is naive to current table. safe it
+				where.FieldName = fmt.Sprintf(`[%s].[%s]`, t.TableName, where.FieldName)
+			}
 			wheres = append(wheres, where)
 			continue
 		}
@@ -839,21 +844,21 @@ func (self *MSSQLLoader) GetGroupCountPageCount(t *Table, others ...map[string]i
 	rawQuery := fmt.Sprintf(`SELECT %s %s`, strings.Join(selectedFields, ", "), nonSelectClause)
 
 	countQuery := fmt.Sprintf(`SELECT count(*) as count FROM (%s) temp`, rawQuery)
-	if IsDebug() {
-		fmt.Println(`MSSQLLoader countQuery`, countQuery)
-	}
-	if IsDebug() {
-		fmt.Println(countQuery)
-	}
+	// if IsDebug() {
+	// 	fmt.Println(`MSSQLLoader countQuery`, countQuery)
+	// }
+	// if IsDebug() {
+	// 	fmt.Println(countQuery)
+	// }
 	if t.Schema == nil {
 		return 0, fmt.Errorf(`no schema pointer found from table[%s]`, t.TableName)
 	}
 	rows, err := t.Schema.Db.Query(countQuery)
 	if IsDebug() {
-		fmt.Println(`MSSQLLoader rawQuery`, rawQuery)
+		fmt.Println("MSSQLLoader rawQuery\n", countQuery)
 	}
 	if err != nil {
-
+		log.Warn(`countQuery err:%s`, err.Error())
 		return 0, fmt.Errorf(`countQuery err:%s`, err.Error())
 	}
 	defer rows.Close()
