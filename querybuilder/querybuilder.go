@@ -111,7 +111,7 @@ func NeedArrayVals(op string) bool {
 func BuildOne(kType string, text string, needOr bool, m map[string]interface{}) error {
 
 	//e.g field = $in:va1,val2,val3
-	opVal := strings.SplitN(text, ":", 3)
+	opVal := strings.SplitN(text, ":", 2)
 
 	//!!!default only one item len(opVal) == 1
 	isOr := false
@@ -238,7 +238,7 @@ func BuildOneParam(kType string, text string, andMap map[string]interface{}, orM
 	ops := strings.Split(text, "|")
 
 	for _, op := range ops {
-
+		fmt.Println(`op===>`, op)
 		if err := BuildOne(kType, op, false, andMap); err != nil {
 			return err
 		}
