@@ -402,6 +402,8 @@ func (w *Where) String(t *Table) string {
 		v := fmt.Sprintf(`%s`, w.Value)
 		//replacing special chars __ to %
 		v = strings.Replace(v, "__", "%", -1)
+		//any underscore will matcha a single char. this is prob not waht we want most of the time.
+		v = strings.Replace(v, "_", "[_]", -1)
 
 		ret := fmt.Sprintf(`%s %s %s '%s'`,
 			ToSQLOperator(w.LogicOperator),
