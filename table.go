@@ -231,9 +231,11 @@ func (t *Table) GetTypeMap() map[string]string {
 		t.extraFieldTypeMap = make(map[string]string)
 	}
 	if t.extraFieldTypeMap != nil {
+		t._extraFieldTypeMapLock.Lock()
 		for k, v := range t.extraFieldTypeMap {
 			prim[k] = v
 		}
+		t._extraFieldTypeMapLock.Unlock()
 	}
 	return prim
 }
