@@ -238,7 +238,7 @@ func BuildOneParam(kType string, text string, andMap map[string]interface{}, orM
 	ops := strings.Split(text, "|")
 
 	for _, op := range ops {
-		fmt.Println(`op===>`, op)
+		// fmt.Println(`op===>`, op)
 		if err := BuildOne(kType, op, false, andMap); err != nil {
 			return err
 		}
