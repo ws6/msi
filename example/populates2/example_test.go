@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 	"testing"
 
 	_ "github.com/denisenkom/go-mssqldb"
@@ -31,23 +32,57 @@ func GetTestConnectionString() string {
 	)
 }
 func GetTestMSI() (*msi.Msi, error) {
+
 	return msi.NewDb(msi.MSSQL, GetTestConnectionString(), os.Getenv(`MSI_TEST_DB`), "")
 
 }
 
-func TestMsSqlOutCountBy(t *testing.T) {
-
+func TestAllMsSqlOutCountBy(t *testing.T) {
 	db, err := GetTestMSI()
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 	defer db.Close()
-	sampleTable := db.GetTable(`sample`)
-	// libraryTable := db.GetTable(`analysis_sample_id`)
 
-	table := sampleTable
-	//tests
 	testStr := `http://host.com:5432/path?_outcountby=analysis_sample_id__sample_id__id&_sortby=t2__user_created__is_ro desc&t0__project_id__name=covidseqtest&_populates=user_created&_populates2=project_id->customer_id->user_created:t0__project_id__name,t1__customer_id__name|user_created:t0__user_created__name`
+	testStr2 := `http://host.com:5432/path?_limit=30&t1__asa_id__case_instance_id=67&_limit=30&_skip=0&_populates2=%s&_sortby=id desc`
+
+	// ||cat:_fastq_lane_data_set.library_id->asa_library.library_id:cat__lane_number
+	recursivePopulateAsaSample := `asa_sample_id->asa_id->workflow_id`
+	recursivePopulateLibraryId := `library_id->analysis_id`
+	//specifyModelPop format
+	//$alias:$leftTable.$leftKey->$rightTable.$rightKey:$fields,,,
+
+	specifyModelPop := `cat:_fastq_lane_data_set.library_id->asa_library.library_id:cat__lane_number`
+	//another example shows the right model can be any existing join alias. it not needs to be a tableName msi knows.
+	specifyModelPop2 := `dog:analysis_qc_metric.analysis_sample_id->t0__library_id.id:`
+
+	pops := []string{
+		recursivePopulateAsaSample,
+		recursivePopulateLibraryId,
+		specifyModelPop,
+		specifyModelPop2,
+	}
+	popStr := strings.Join(pops, `|`)
+	testStr2 = fmt.Sprintf(testStr2, popStr)
+
+	tests := [][2]string{
+		{`sample`, testStr},
+		{`asa_library`, testStr2},
+	}
+
+	for _, test := range tests {
+		t.Log(test)
+		DoTestMsSqlOutCountBy(t, db, test)
+	}
+}
+
+func DoTestMsSqlOutCountBy(t *testing.T, db *msi.Msi, test [2]string) {
+
+	tableName := test[0]
+	table := db.GetTable(tableName)
+
+	testStr := test[1]
 
 	u, err := url.Parse(testStr)
 	if err != nil {
@@ -113,7 +148,7 @@ func TestMsSqlOutCountBy(t *testing.T) {
 	others := []map[string]interface{}{crit}
 
 	metaQuery := map[string]interface{}{
-		msi.LIMIT:        1, // qb.Limit,
+		msi.LIMIT:        qb.Limit,
 		msi.OFFSET:       qb.Skip,
 		msi.ORDERBY:      qb.SortBy,
 		msi.GROUPBY:      qb.GroupBy,

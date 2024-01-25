@@ -123,6 +123,96 @@ func (self *MSSQLLoader) CompilePopulates2(t *Table, key string, order int,
 	return
 }
 
+//CompilePopulates3 parsing user specified join statement. danger.
+//CompilePopulates3 can join models not neccessarily a parent FK
+func (self *MSSQLLoader) CompilePopulates3(t *Table,
+	alias string,
+	allowedFields []string,
+	joinLeftPart, jointRightPart string) (
+
+	selectedFields []string,
+	nonSelectClause string,
+	typeMap map[string]string,
+	err error,
+
+) {
+	typeMap = make(map[string]string)
+	leftSp := strings.Split(joinLeftPart, ".")
+	if len(leftSp) < 2 {
+		err = fmt.Errorf(`left part incorrect expect model.key`)
+		return
+	}
+	leftTableName := leftSp[0]
+	leftKey := leftSp[1]                          //we can support multiple keys join here
+	rightSp := strings.Split(jointRightPart, ".") //right part must already exist in entire statement. othewise it could fail
+	if len(rightSp) < 2 {
+		err = fmt.Errorf(`right part incorrect expect model.key`)
+		return
+	}
+	rightTableName := rightSp[0] //we dont need verify the rightTableName. it could be any table alias.
+	rightKey := rightSp[1]
+
+	//compile fields
+
+	leftTable := t.GetMsi().GetTable(leftTableName)
+	if leftTable == nil {
+		err = fmt.Errorf(`no left table - %s`, leftTableName)
+		return
+	}
+	localAllowedField := []string{}
+	for _, s := range allowedFields {
+		if strings.HasPrefix(s, alias) {
+			localAllowedField = append(localAllowedField, s)
+		}
+	}
+	newFields := []string{}
+	for _, f := range leftTable.Fields {
+		//check each field
+
+		if f.Hide {
+			continue
+		}
+
+		if f.Name == leftKey {
+			continue
+		}
+
+		nk := fmt.Sprintf(`%s__%s`, alias, f.Name)
+		if len(localAllowedField) > 0 && !StringInSlice(nk, localAllowedField) {
+			continue
+		}
+
+		fieldFullName := fmt.Sprintf(` ,[%s].[%s] as [%s] `, leftTableName, f.Name, nk)
+		//TODO inject typemap
+		newFields = append(newFields, fieldFullName)
+		selectedFields = append(selectedFields, nk)
+		typeMap[nk] = f.Type
+
+	}
+
+	fieldsStr := strings.Join(newFields, "\n")
+	leftKeyAlias := fmt.Sprintf(`%s__%s`, alias, leftKey)
+	nonSelectClause = fmt.Sprintf(`
+		LEFT JOIN (
+ 			 select 
+			 %s as [%s]
+			 %s
+ 			from [%s]    
+ 			 
+ 		) [%s] 
+		on [%s].[%s] = [%s].[%s]
+	`,
+		leftKey, leftKeyAlias, //has to present
+		fieldsStr,
+		leftTableName,
+		alias,
+		alias, leftKeyAlias,
+		rightTableName, rightKey,
+	)
+
+	return
+}
+
 //CompileAllPopulates2 convert from query formatter to query
 func (self *MSSQLLoader) CompileAllPopulates2(t *Table, populates2 []string) (
 	selectedFields []string,
@@ -144,14 +234,16 @@ func (self *MSSQLLoader) CompileAllPopulates2(t *Table, populates2 []string) (
 			err = fmt.Errorf(`p2 key is empty at pos[%d]`, i)
 			return
 		}
-
+		if len(sp1) > 2 {
+			continue //leaving to the end
+		}
 		comboKeys := strings.TrimSpace(sp1[0]) //comboKeys=$keyX1-->$keyX2-->$keyX3
 		if comboKeys == "" {
 			err = fmt.Errorf(`p2 key is empty or with spaces at pos[%d]`, i)
 			return
 		}
 		fields := []string{}
-		if len(sp1) > 1 {
+		if len(sp1) == 2 {
 			fields = strings.Split(sp1[1], ",")
 		}
 
@@ -199,5 +291,38 @@ func (self *MSSQLLoader) CompileAllPopulates2(t *Table, populates2 []string) (
 
 	}
 
+	//insert v3 style pop at the end in case losing reference table.
+	for i, p2 := range populates2 {
+		sp1 := strings.Split(p2, ":") //first split the keys and fields
+		if len(sp1) != 3 {
+			continue //only deal with alias:left_table.left_key.right_table.right_key:fields
+		}
+		//e.g. ?_populates2=tmp:fastq_lane_dataset.library_id->asa_library.library_id:tmp_yield,tmp_status,tmp_id
+		alias := sp1[0] //user responseble for non-duplciate alias
+		joinStr := sp1[1]
+		jsp := strings.Split(joinStr, "->")
+		if len(jsp) != 2 {
+			err = fmt.Errorf(`wrong join, expect fastq_lane_dataset.library_id->asa_library.library_id at[%d]`, i)
+			return
+		}
+
+		fieldStr := sp1[2]
+		fields := strings.Split(fieldStr, ",") //user reponsible for existing keys
+
+		_selectedFields, _nonSelectClause, _typeMap, _err := self.CompilePopulates3(t, alias, fields, jsp[0], jsp[1])
+		if _err != nil {
+			err = _err
+			return
+		}
+
+		nonSelectClause = append(nonSelectClause, _nonSelectClause)
+		selectedFields = append(selectedFields, _selectedFields...)
+
+		for k, v := range _typeMap {
+			t.SetExtraTypeMap(k, v)
+			typeMap[k] = v
+		}
+
+	}
 	return
 }
