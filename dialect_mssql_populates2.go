@@ -16,7 +16,7 @@ import (
 //	allowedFields - which fields to expose; empty for all
 //returns:
 //
-func (self *MSSQLLoader) CompilePopulates2(t *Table, key string, order int,
+func (self *MSSQLLoader) CompilePopulates2(t *Table, keyOrAlt string, order int,
 	preTableName, prePKName string,
 	allowedFields []string) (
 	nextTable *Table, //the fk table key is using
@@ -28,7 +28,15 @@ func (self *MSSQLLoader) CompilePopulates2(t *Table, key string, order int,
 	err error,
 ) {
 	typeMap = make(map[string]string)
+	sp := strings.Split(keyOrAlt, "@")
+	key := sp[0]
 	newTempTableName = fmt.Sprintf(`t%d__%s`, order, key) //unique
+
+	if len(sp) > 1 {
+		//user passed in alt name
+		alt := sp[1] //be careful not using malformatted strings. before we invest more
+		newTempTableName = alt
+	}
 
 	field := t.GetField(key)
 	if field == nil {
